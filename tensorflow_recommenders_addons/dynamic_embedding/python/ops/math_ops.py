@@ -87,56 +87,52 @@ def sparse_segment_sum(data,
     has size `k`, the number of segments specified via `num_segments` or
     inferred for the last element in `segments_ids`.
   """
-  gpu_devices = config.list_physical_devices('GPU')
-  if gpu_devices:
-    if context.executing_eagerly():
-      try:
-        return _sparse_segment_sum_gpu(data,
-                                       indices,
-                                       segment_ids,
-                                       name=name,
-                                       num_segments=num_segments)
-      except errors.NotFoundError:
-        tf_logging.warn('`tfra.dynamic_embedding.sparse_segment_sum` is not'
-                        ' found. Use tf.sparse.segment_sum instead.')
-        return tf.sparse.segment_sum(data,
-                                     indices,
-                                     segment_ids,
-                                     name=name,
-                                     num_segments=num_segments)
-
-    else:
-      predef = _sparse_segment_sum_gpu(data,
-                                       indices,
-                                       segment_ids,
-                                       name=name,
-                                       num_segments=num_segments)
-
-      use_origin = False
-      if predef.device == '':
-        tf_logging.warn(
-            'SparseSegmentSum({}) has not been assigned device, '
-            'while GPU are available: {}, so use GPU by default.'.format(
-                predef.name, gpu_devices))
-      else:
-        device_type = predef.device.split(':')[-2][-3:].lower()
-        if 'gpu' in device_type:
-          use_origin = True
-
-      if use_origin:
-        return tf.sparse.segment_sum(data,
-                                     indices,
-                                     segment_ids,
-                                     name=name,
-                                     num_segments=num_segments)
-      return predef
-
-  else:
+  if not (gpu_devices := config.list_physical_devices('GPU')):
     return tf.sparse.segment_sum(data,
                                  indices,
                                  segment_ids,
                                  name=name,
                                  num_segments=num_segments)
+  if context.executing_eagerly():
+    try:
+      return _sparse_segment_sum_gpu(data,
+                                     indices,
+                                     segment_ids,
+                                     name=name,
+                                     num_segments=num_segments)
+    except errors.NotFoundError:
+      tf_logging.warn('`tfra.dynamic_embedding.sparse_segment_sum` is not'
+                      ' found. Use tf.sparse.segment_sum instead.')
+      return tf.sparse.segment_sum(data,
+                                   indices,
+                                   segment_ids,
+                                   name=name,
+                                   num_segments=num_segments)
+
+  else:
+    predef = _sparse_segment_sum_gpu(data,
+                                     indices,
+                                     segment_ids,
+                                     name=name,
+                                     num_segments=num_segments)
+
+    use_origin = False
+    if predef.device == '':
+      tf_logging.warn(
+          f'SparseSegmentSum({predef.name}) has not been assigned device, while GPU are available: {gpu_devices}, so use GPU by default.'
+      )
+    else:
+      device_type = predef.device.split(':')[-2][-3:].lower()
+      if 'gpu' in device_type:
+        use_origin = True
+
+    if use_origin:
+      return tf.sparse.segment_sum(data,
+                                   indices,
+                                   segment_ids,
+                                   name=name,
+                                   num_segments=num_segments)
+    return predef
 
 
 def _sparse_segment_sum_gpu(data,
@@ -187,36 +183,32 @@ def sparse_fill_empty_rows(sp_input, default_value, name=None):
     empty_row_indicator: A bool vector of length `N` indicating whether each
       input row was empty.
   """
-  gpu_devices = config.list_physical_devices('GPU')
-  if gpu_devices:
-    if context.executing_eagerly():
-      try:
-        return _sparse_fill_empty_rows_gpu(sp_input, default_value, name=name)
-      except errors.NotFoundError:
-        tf_logging.warn('`tfra.dynamic_embedding.sparse_fill_empty_rows` is not'
-                        ' found. Use tf.sparse.fill_empty_rows instead.')
-        return tf.sparse.fill_empty_rows(sp_input, default_value, name=name)
-
-    else:
-      predef = _sparse_fill_empty_rows_gpu(sp_input, default_value, name=name)
-
-      use_origin = False
-      if predef[0].values.device == '':
-        tf_logging.warn(
-            'SparseFillEmptyRows({}) has not been assigned device, '
-            'while GPU are available: {}, so use GPU by default.'.format(
-                predef[0].values.name, gpu_devices))
-      else:
-        device_type = predef[0].values.device.split(':')[-2][-3:].lower()
-        if 'gpu' in device_type:
-          use_origin = True
-
-      if use_origin:
-        return tf.sparse.fill_empty_rows(sp_input, default_value, name=name)
-      return predef
+  if not (gpu_devices := config.list_physical_devices('GPU')):
+    return tf.sparse.fill_empty_rows(sp_input, default_value, name=name)
+  if context.executing_eagerly():
+    try:
+      return _sparse_fill_empty_rows_gpu(sp_input, default_value, name=name)
+    except errors.NotFoundError:
+      tf_logging.warn('`tfra.dynamic_embedding.sparse_fill_empty_rows` is not'
+                      ' found. Use tf.sparse.fill_empty_rows instead.')
+      return tf.sparse.fill_empty_rows(sp_input, default_value, name=name)
 
   else:
-    return tf.sparse.fill_empty_rows(sp_input, default_value, name=name)
+    predef = _sparse_fill_empty_rows_gpu(sp_input, default_value, name=name)
+
+    use_origin = False
+    if predef[0].values.device == '':
+      tf_logging.warn(
+          f'SparseFillEmptyRows({predef[0].values.name}) has not been assigned device, while GPU are available: {gpu_devices}, so use GPU by default.'
+      )
+    else:
+      device_type = predef[0].values.device.split(':')[-2][-3:].lower()
+      if 'gpu' in device_type:
+        use_origin = True
+
+    if use_origin:
+      return tf.sparse.fill_empty_rows(sp_input, default_value, name=name)
+    return predef
 
 
 def _sparse_fill_empty_rows_gpu(sp_input, default_value, name=None):
@@ -259,36 +251,30 @@ def sparse_reshape(sp_input, shape, name=None):
     A `SparseTensor` with the same non-empty values but with indices calculated
     by the new dense shape.
   """
-  gpu_devices = config.list_physical_devices('GPU')
-  if gpu_devices:
-    if context.executing_eagerly():
-      try:
-        return _sparse_reshape_gpu(sp_input, shape, name=name)
-      except errors.NotFoundError:
-        tf_logging.warn('`tfra.dynamic_embedding.sparse_reshape` is not'
-                        ' found. Use tf.sparse.reshape instead.')
-        return tf.sparse.reshape(sp_input, shape, name=name)
-
-    else:
-      predef = _sparse_reshape_gpu(sp_input, shape, name=name)
-
-      use_origin = False
-      if predef.values.device == '':
-        tf_logging.warn(
-            'SparseReshape({}) has not been assigned device, '
-            'while GPU are available: {}, so use GPU by default.'.format(
-                predef.values.name, gpu_devices))
-      else:
-        device_type = predef.values.device.split(':')[-2][-3:].lower()
-        if 'gpu' in device_type:
-          use_origin = True
-
-      if use_origin:
-        return tf.sparse.reshape(sp_input, shape, name=name)
-      return predef
+  if not (gpu_devices := config.list_physical_devices('GPU')):
+    return tf.sparse.reshape(sp_input, shape, name=name)
+  if context.executing_eagerly():
+    try:
+      return _sparse_reshape_gpu(sp_input, shape, name=name)
+    except errors.NotFoundError:
+      tf_logging.warn('`tfra.dynamic_embedding.sparse_reshape` is not'
+                      ' found. Use tf.sparse.reshape instead.')
+      return tf.sparse.reshape(sp_input, shape, name=name)
 
   else:
-    return tf.sparse.reshape(sp_input, shape, name=name)
+    predef = _sparse_reshape_gpu(sp_input, shape, name=name)
+
+    use_origin = False
+    if predef.values.device == '':
+      tf_logging.warn(
+          f'SparseReshape({predef.values.name}) has not been assigned device, while GPU are available: {gpu_devices}, so use GPU by default.'
+      )
+    else:
+      device_type = predef.values.device.split(':')[-2][-3:].lower()
+      if 'gpu' in device_type:
+        use_origin = True
+
+    return tf.sparse.reshape(sp_input, shape, name=name) if use_origin else predef
 
 
 def _sparse_reshape_gpu(sp_input, shape, name=None):
@@ -319,8 +305,8 @@ def _sparse_reshape_gpu(sp_input, shape, name=None):
         num_implied_by_user = sum(d == -1 for d in shape_const_by_user)
         if num_implied_by_user > 1:
           raise ValueError(
-              "At most one dimension can be inferred (-1). Found: %s" %
-              shape_const_by_user)
+              f"At most one dimension can be inferred (-1). Found: {shape_const_by_user}"
+          )
       original_reshaped_shape = list(reshaped_shape_const)  # A copy
       in_shape_size = np.prod(sp_input.shape.as_list())
       num_implied = sum(dim is None for dim in reshaped_shape_const)

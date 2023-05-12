@@ -48,8 +48,8 @@ def _load_library(filename, lib="op"):
     except (tf.errors.NotFoundError, OSError) as e:
       errs.append(str(e))
   raise NotImplementedError(
-      "unable to open file: " +
-      "{}, from paths: {}\ncaused by: {}".format(filename, filenames, errs))
+      f"unable to open file: {filename}, from paths: {filenames}\ncaused by: {errs}"
+  )
 
 
 gen_ev_ops = _load_library("../core/_ev_ops.so")

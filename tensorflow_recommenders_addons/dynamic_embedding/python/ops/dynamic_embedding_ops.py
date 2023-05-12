@@ -56,7 +56,7 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
 
   def __getattribute__(self, name):
     if name in ["sparse_read", "gather_nd"]:
-      raise AttributeError("no such method: {}".format(name))
+      raise AttributeError(f"no such method: {name}")
     return super(resource_variable_ops.ResourceVariable,
                  self).__getattribute__(name)
 
@@ -101,8 +101,7 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
           self.name, self.get_shape(), self.dtype.name,
           ops.numpy_text(self.read_value(), is_repr=True))
     else:
-      return "<tf.Variable '%s' shape=%s dtype=%s>" % (
-          self.name, self.get_shape(), self.dtype.name)
+      return f"<tf.Variable '{self.name}' shape={self.get_shape()} dtype={self.dtype.name}>"
 
   def _init_from_args(
       self,
@@ -217,7 +216,7 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
     with ops.init_scope():
       self._in_graph_mode = not context.executing_eagerly()
       with ops.name_scope(name, "TrainableWrapper",
-                          [] if init_from_fn else [initial_value]) as name:
+                              [] if init_from_fn else [initial_value]) as name:
         # pylint: disable=protected-access
         handle_name = ops.name_from_scope_name(name)
         handle_name = handle_name or "TrainableWrapperHandle"
@@ -229,17 +228,14 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
           # accidental sharing.
           unique_id = "%s_%d" % (handle_name, ops.uid())
           tf_major_version, _, _ = get_tf_version_triple()
-          if int(tf_major_version) >= 2:
-            shared_name = None  # Never shared
-          else:
-            shared_name = context.shared_name()
+          shared_name = None if int(tf_major_version) >= 2 else context.shared_name()
         # Use attr_scope and device(None) to simulate the behavior of
         # colocate_with when the variable we want to colocate with doesn't
         # yet exist.
         device_context_manager = (ops.device if self._in_graph_mode else
                                   ops.NullContextmanager)
         attr = attr_value_pb2.AttrValue(list=attr_value_pb2.AttrValue.ListValue(
-            s=[compat.as_bytes("loc:@%s" % handle_name)]))
+            s=[compat.as_bytes(f"loc:@{handle_name}")]))
         with ops.get_default_graph()._attr_scope({"_class": attr}):
           with ops.name_scope("Initializer"), device_context_manager(None):
             initial_value = ops.convert_to_tensor(
@@ -394,8 +390,7 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
       # might not actually be the handle. This line bypasses it.
       tape.record_operation("ReadVariableOp", [_result], [self._handle],
                             lambda x: [x])
-    result = self.transform(_result)
-    return result
+    return self.transform(_result)
 
   def read_value(self, do_prefetch=True):
     """Constructs an op which reads the value of this variable.
@@ -421,10 +416,7 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
 
     def _rank(x):
       rank = ops.convert_to_tensor(x).get_shape().ndims
-      if rank:
-        return rank, True
-      else:
-        return array_ops.rank(x), False
+      return (rank, True) if rank else (array_ops.rank(x), False)
 
     if max_norm is None:
       return params
@@ -446,8 +438,8 @@ class TrainableWrapper(resource_variable_ops.ResourceVariable):
   def _track_optimizer_slots(self, slots):
     if not all(isinstance(s, TrainableWrapper) for s in slots):
       raise TypeError(
-          'Can only track TrainableWrapper slots, but get {}'.format(
-              [type(s) for s in slots]))
+          f'Can only track TrainableWrapper slots, but get {[type(s) for s in slots]}'
+      )
     identifiers = [optimizer_v2._var_key(s) for s in self._tracked_slots]
     for s in slots:
       if optimizer_v2._var_key(s) not in identifiers:
@@ -513,8 +505,8 @@ def embedding_lookup(
     )
 
   scope = variable_scope.get_variable_scope()
-  full_name = scope.name + "/" if scope.name else ""
-  full_name += (name + "/") if name else "embedding_lookup/"
+  full_name = f"{scope.name}/" if scope.name else ""
+  full_name += f"{name}/" if name else "embedding_lookup/"
   with ops.name_scope(full_name):
     ids = ops.convert_to_tensor(ids, name="ids")
     if ids.get_shape().is_fully_defined():
@@ -713,13 +705,13 @@ def embedding_lookup_sparse(
     raise TypeError("sp_ids must be SparseTensor")
 
   ignore_weights = sp_weights is None
-  if not ignore_weights:
-    if not isinstance(sp_weights, sparse_tensor.SparseTensor):
-      raise TypeError("sp_weights must be either None or SparseTensor")
+  if not ignore_weights and not isinstance(sp_weights,
+                                           sparse_tensor.SparseTensor):
+    raise TypeError("sp_weights must be either None or SparseTensor")
 
   scope = variable_scope.get_variable_scope()
-  full_name = scope.name + "/" + name if scope.name else name
-  with ops.name_scope(full_name + "/"):
+  full_name = f"{scope.name}/{name}" if scope.name else name
+  with ops.name_scope(f"{full_name}/"):
     segment_ids = sp_ids.indices[:, 0]
     if segment_ids.dtype != dtypes.int32:
       segment_ids = math_ops.cast(segment_ids, dtypes.int32)
@@ -730,7 +722,7 @@ def embedding_lookup_sparse(
     embeddings, trainable_ = embedding_lookup(
         params,
         ids,
-        name=name + "/embedding_lookup",
+        name=f"{name}/embedding_lookup",
         partition_strategy=partition_strategy,
         max_norm=max_norm,
         return_trainable=True,
@@ -852,22 +844,22 @@ def safe_embedding_lookup_sparse(
       ValueError: if `embedding_weights` is empty.
   """
   if embedding_weights is None:
-    raise ValueError("Missing embedding_weights %s." % embedding_weights)
+    raise ValueError(f"Missing embedding_weights {embedding_weights}.")
 
   if embedding_weights.key_dtype != sparse_ids.dtype:
     raise TypeError(
-        "embedding_weights.key_dtype should be same with sparse_ids.dtype: "
-        "{} vs. {}".format(embedding_weights.key_dtype, sparse_ids.dtype))
+        f"embedding_weights.key_dtype should be same with sparse_ids.dtype: {embedding_weights.key_dtype} vs. {sparse_ids.dtype}"
+    )
 
   weights_dtype = sparse_weights.dtype if sparse_weights is not None else None
   if weights_dtype and embedding_weights.value_dtype != weights_dtype:
     raise TypeError(
-        "embedding_weights.value_dtype should be same with sparse_weights.dtype"
-        ": {} vs. {}".format(embedding_weights.value_dtype, weights_dtype))
+        f"embedding_weights.value_dtype should be same with sparse_weights.dtype: {embedding_weights.value_dtype} vs. {weights_dtype}"
+    )
 
   scope = variable_scope.get_variable_scope()
-  full_name = scope.name + "/" + name if scope.name else name
-  with ops.name_scope(full_name + "/"):
+  full_name = f"{scope.name}/{name}" if scope.name else name
+  with ops.name_scope(f"{full_name}/"):
     # Reshape higher-rank sparse ids and weights to linear segment ids.
     original_shape = sparse_ids.dense_shape
     original_rank_dim = tensor_shape.dimension_value(
@@ -904,7 +896,7 @@ def safe_embedding_lookup_sparse(
         sparse_weights,
         combiner=combiner,
         partition_strategy=partition_strategy,
-        name=name + "/embedding_lookup_sparse",
+        name=f"{name}/embedding_lookup_sparse",
         max_norm=max_norm,
         return_trainable=True,
     )

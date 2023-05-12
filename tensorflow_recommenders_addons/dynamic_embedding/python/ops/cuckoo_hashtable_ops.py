@@ -152,7 +152,7 @@ class CuckooHashTable(LookupInterface):
         Returns:
           A scalar tensor containing the number of elements in this table.
         """
-    with ops.name_scope(name, "%s_Size" % self.name, [self.resource_handle]):
+    with ops.name_scope(name, f"{self.name}_Size", [self.resource_handle]):
       with ops.colocate_with(self.resource_handle):
         return cuckoo_ops.tfra_cuckoo_hash_table_size(self.resource_handle)
 
@@ -173,14 +173,11 @@ class CuckooHashTable(LookupInterface):
           TypeError: when `keys` do not match the table data types.
         """
     if keys.dtype != self._key_dtype:
-      raise TypeError("Signature mismatch. Keys must be dtype %s, got %s." %
-                      (self._key_dtype, keys.dtype))
+      raise TypeError(
+          f"Signature mismatch. Keys must be dtype {self._key_dtype}, got {keys.dtype}."
+      )
 
-    with ops.name_scope(
-        name,
-        "%s_lookup_table_remove" % self.name,
-        (self.resource_handle, keys, self._default_value),
-    ):
+    with ops.name_scope(name, f"{self.name}_lookup_table_remove", (self.resource_handle, keys, self._default_value)):
       op = cuckoo_ops.tfra_cuckoo_hash_table_remove(self.resource_handle, keys)
 
     return op
@@ -194,8 +191,7 @@ class CuckooHashTable(LookupInterface):
     Returns:
       The created Operation.
     """
-    with ops.name_scope(name, "%s_lookup_table_clear" % self.name,
-                        (self.resource_handle, self._default_value)):
+    with ops.name_scope(name, f"{self.name}_lookup_table_clear", (self.resource_handle, self._default_value)):
       op = cuckoo_ops.tfra_cuckoo_hash_table_clear(
           self.resource_handle,
           key_dtype=self._key_dtype,
@@ -233,11 +229,7 @@ class CuckooHashTable(LookupInterface):
       Raises:
         TypeError: when `keys` do not match the table data types.
     """
-    with ops.name_scope(
-        name,
-        "%s_lookup_table_find" % self.name,
-        (self.resource_handle, keys, self._default_value),
-    ):
+    with ops.name_scope(name, f"{self.name}_lookup_table_find", (self.resource_handle, keys, self._default_value)):
       keys = ops.convert_to_tensor(keys, dtype=self._key_dtype, name="keys")
       with ops.colocate_with(self.resource_handle, ignore_existing=True):
         if return_exists:
@@ -273,11 +265,7 @@ class CuckooHashTable(LookupInterface):
           TypeError: when `keys` or `values` doesn't match the table data
             types.
         """
-    with ops.name_scope(
-        name,
-        "%s_lookup_table_insert" % self.name,
-        [self.resource_handle, keys, values],
-    ):
+    with ops.name_scope(name, f"{self.name}_lookup_table_insert", [self.resource_handle, keys, values]):
       keys = ops.convert_to_tensor(keys, self._key_dtype, name="keys")
       values = ops.convert_to_tensor(values, self._value_dtype, name="values")
       with ops.colocate_with(self.resource_handle, ignore_existing=True):
@@ -305,11 +293,7 @@ class CuckooHashTable(LookupInterface):
         TypeError: when `keys` or `values` doesn't match the table data
           types.
     """
-    with ops.name_scope(
-        name,
-        "%s_lookup_table_accum" % self.name,
-        [self.resource_handle, keys, values_or_deltas],
-    ):
+    with ops.name_scope(name, f"{self.name}_lookup_table_accum", [self.resource_handle, keys, values_or_deltas]):
       keys = ops.convert_to_tensor(keys, self._key_dtype, name="keys")
       values_or_deltas = ops.convert_to_tensor(values_or_deltas,
                                                self._value_dtype,
@@ -331,8 +315,7 @@ class CuckooHashTable(LookupInterface):
           A pair of tensors with the first tensor containing all keys and the
             second tensors containing all values in the table.
         """
-    with ops.name_scope(name, "%s_lookup_table_export_values" % self.name,
-                        [self.resource_handle]):
+    with ops.name_scope(name, f"{self.name}_lookup_table_export_values", [self.resource_handle]):
       with ops.colocate_with(self.resource_handle):
         keys, values = cuckoo_ops.tfra_cuckoo_hash_table_export(
             self.resource_handle, self._key_dtype, self._value_dtype)
@@ -358,8 +341,8 @@ class CuckooHashTable(LookupInterface):
     def __init__(self, table, name, full_name=""):
       tensors = table.export()
       specs = [
-          BaseSaverBuilder.SaveSpec(tensors[0], "", name + "-keys"),
-          BaseSaverBuilder.SaveSpec(tensors[1], "", name + "-values"),
+          BaseSaverBuilder.SaveSpec(tensors[0], "", f"{name}-keys"),
+          BaseSaverBuilder.SaveSpec(tensors[1], "", f"{name}-values"),
       ]
       # pylint: disable=protected-access
       super(CuckooHashTable._Saveable, self).__init__(table, specs, name)
@@ -368,7 +351,7 @@ class CuckooHashTable(LookupInterface):
     def restore(self, restored_tensors, restored_shapes, name=None):
       del restored_shapes  # unused
       # pylint: disable=protected-access
-      with ops.name_scope(name, "%s_table_restore" % self._restore_name):
+      with ops.name_scope(name, f"{self._restore_name}_table_restore"):
         with ops.colocate_with(self.op.resource_handle):
           return cuckoo_ops.tfra_cuckoo_hash_table_import(
               self.op.resource_handle,

@@ -66,8 +66,7 @@ def input_fn():
   shuffled = ratings.shuffle(1_000_000,
                              seed=2021,
                              reshuffle_each_iteration=False)
-  dataset = shuffled.batch(256)
-  return dataset
+  return shuffled.batch(256)
 
 
 def model_fn(features, labels, mode, params):
@@ -81,7 +80,7 @@ def model_fn(features, labels, mode, params):
   # Unlike cuckoo, TFRA-redis run in localhost.
   if is_training:
     ps_list = [
-        "/job:localhost/replica:0/task:{}/CPU:0".format(i)
+        f"/job:localhost/replica:0/task:{i}/CPU:0"
         for i in range(params["ps_num"])
     ]
     initializer = tf.keras.initializers.RandomNormal(-1, 1)

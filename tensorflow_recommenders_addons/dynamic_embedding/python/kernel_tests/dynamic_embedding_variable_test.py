@@ -141,9 +141,7 @@ def model_fn(sparse_vars, embed_dim, feature_inputs):
     dnn_fn = layers.Dense(dimension, use_bias=False)
     batch_normal_fn = layers.BatchNormalization()
     dnn_result = dnn_fn(entry)
-    if activation:
-      return batch_normal_fn(nn.selu(dnn_result))
-    return dnn_result
+    return batch_normal_fn(nn.selu(dnn_result)) if activation else dnn_result
 
   def dnn_fn(entry, dimension, activation=False):
     hidden = layer_fn(entry, dimension, activation)
@@ -238,7 +236,7 @@ def _random_weights(
                                                       stddev=1.0 /
                                                       math.sqrt(vocab_size),
                                                       dtype=dtypes.float32)
-  embedding_weights = de.get_variable(
+  return de.get_variable(
       key_dtype=key_dtype,
       value_dtype=value_dtype,
       devices=_get_devices() * num_shards,
@@ -246,7 +244,6 @@ def _random_weights(
       initializer=initializer,
       dim=embed_dim,
   )
-  return embedding_weights
 
 
 def _test_dir(temp_dir, test_name):
@@ -261,7 +258,7 @@ def _test_dir(temp_dir, test_name):
     """
   test_dir = os.path.join(temp_dir, test_name)
   if os.path.isdir(test_dir):
-    for f in glob.glob("%s/*" % test_dir):
+    for f in glob.glob(f"{test_dir}/*"):
       os.remove(f)
   else:
     os.makedirs(test_dir)
@@ -279,7 +276,7 @@ def _create_dynamic_shape_tensor(
   def _func():
     length = np.random.randint(min_len, max_len)
     tensor = np.random.randint(min_val, max_val, max_len, dtype=dtype)
-    tensor = np.array(tensor[0:length], dtype=dtype)
+    tensor = np.array(tensor[:length], dtype=dtype)
     return tensor
 
   return _func
@@ -312,9 +309,10 @@ class TestGraph(object):
 
     # variable graph
     self.var = resource_variable_ops.ResourceVariable(
-        name='t2021-' + var_name + str(run_id),
+        name=f't2021-{var_name}{str(run_id)}',
         initial_value=self.init_vals,
-        dtype=self.value_dtype)
+        dtype=self.value_dtype,
+    )
     ids = constant_op.constant(raw_ids, dtype=self.key_dtype)
     self.var_lookup = embedding_ops.embedding_lookup([self.var], ids)
     self.var_pred = math_ops.matmul(self.var_lookup, self.x)
@@ -322,12 +320,14 @@ class TestGraph(object):
     self.var_opt_op = adam.AdamOptimizer(0.1).minimize(self.var_loss)
 
     # deo variable graph
-    self.devar = de.get_variable(name='t2021-' + devar_name + str(run_id),
-                                 key_dtype=self.key_dtype,
-                                 value_dtype=self.value_dtype,
-                                 devices=_get_devices() * num_shards,
-                                 initializer=1.,
-                                 dim=dim)
+    self.devar = de.get_variable(
+        name=f't2021-{devar_name}{str(run_id)}',
+        key_dtype=self.key_dtype,
+        value_dtype=self.value_dtype,
+        devices=_get_devices() * num_shards,
+        initializer=1.0,
+        dim=dim,
+    )
     self.devar_init_op = self.devar.upsert(
         constant_op.constant(init_ids, dtype=self.key_dtype),
         constant_op.constant(self.init_vals, dtype=self.value_dtype))
@@ -352,7 +352,7 @@ def _get_meta_file(ckpt_dir):
     if fname.endswith(".meta"):
       return os.path.join(ckpt_dir, fname)
   else:
-    raise ValueError("No meta file found in {}.".format(ckpt_dir))
+    raise ValueError(f"No meta file found in {ckpt_dir}.")
 
 
 default_config = config_pb2.ConfigProto(
@@ -387,19 +387,20 @@ class VariableTest(test.TestCase):
     for (key_dtype, value_dtype), dim in itertools.product(kv_list, dim_list):
       id += 1
       with self.session(config=default_config,
-                        use_gpu=test_util.is_gpu_available()) as sess:
+                            use_gpu=test_util.is_gpu_available()) as sess:
         keys = constant_op.constant(
             np.array([0, 1, 2, 3]).astype(_type_converter(key_dtype)),
             key_dtype)
         values = constant_op.constant(
             _convert([[0] * dim, [1] * dim, [2] * dim, [3] * dim], value_dtype),
             value_dtype)
-        table = de.get_variable('t1-' + str(id),
-                                key_dtype=key_dtype,
-                                value_dtype=value_dtype,
-                                initializer=np.array([-1]).astype(
-                                    _type_converter(value_dtype)),
-                                dim=dim)
+        table = de.get_variable(
+            f't1-{id}',
+            key_dtype=key_dtype,
+            value_dtype=value_dtype,
+            initializer=np.array([-1]).astype(_type_converter(value_dtype)),
+            dim=dim,
+        )
         self.assertAllEqual(0, self.evaluate(table.size()))
 
         self.evaluate(table.upsert(keys, values))
@@ -456,7 +457,7 @@ class VariableTest(test.TestCase):
     for (key_dtype, value_dtype), dim in itertools.product(kv_list, dim_list):
       id += 1
       with self.session(config=default_config,
-                        use_gpu=test_util.is_gpu_available()) as sess:
+                            use_gpu=test_util.is_gpu_available()) as sess:
         base_keys = constant_op.constant(
             np.array([0, 1, 2, 3]).astype(_type_converter(key_dtype)),
             key_dtype)
@@ -485,12 +486,13 @@ class VariableTest(test.TestCase):
         exported_exists = constant_op.constant([True, True, False, True],
                                                dtype=dtypes.bool)
 
-        table = de.get_variable('taccum1-' + str(id),
-                                key_dtype=key_dtype,
-                                value_dtype=value_dtype,
-                                initializer=np.array([-1]).astype(
-                                    _type_converter(value_dtype)),
-                                dim=dim)
+        table = de.get_variable(
+            f'taccum1-{id}',
+            key_dtype=key_dtype,
+            value_dtype=value_dtype,
+            initializer=np.array([-1]).astype(_type_converter(value_dtype)),
+            dim=dim,
+        )
 
         self.assertAllEqual(0, self.evaluate(table.size()))
 
@@ -529,11 +531,11 @@ class VariableTest(test.TestCase):
         (init_ops.random_normal_initializer(0.0, 0.01, seed=2), 0.0, 0.01),
     ]:
       with self.session(config=default_config,
-                        use_gpu=test_util.is_gpu_available()):
+                            use_gpu=test_util.is_gpu_available()):
         id += 1
         keys = constant_op.constant(list(range(2**17)), dtypes.int64)
         table = de.get_variable(
-            "t1" + str(id),
+            f"t1{id}",
             key_dtype=dtypes.int64,
             value_dtype=dtypes.float32,
             initializer=initializer,
@@ -544,8 +546,8 @@ class VariableTest(test.TestCase):
         stddev = self.evaluate(math_ops.reduce_std(vals_op))
         rtol = 2e-5
         atol = rtol
-        self.assertAllClose(target_mean, mean, rtol, atol)
-        self.assertAllClose(target_stddev, stddev, rtol, atol)
+        self.assertAllClose(target_mean, mean, atol, atol)
+        self.assertAllClose(target_stddev, stddev, atol, atol)
 
   def test_save_restore(self):
     if context.executing_eagerly():
@@ -719,7 +721,7 @@ class VariableTest(test.TestCase):
                                stateful=True)
 
       params = de.get_variable(
-          name="params-test-0915-" + str(id),
+          name=f"params-test-0915-{id}",
           key_dtype=key_dtype,
           value_dtype=value_dtype,
           initializer=init_ops.random_normal_initializer(0.0, 0.01),
@@ -798,20 +800,18 @@ class VariableTest(test.TestCase):
     keys_dtype_list = [dtypes.int64]
     values_dtype_list = [dtypes.float32]
 
-    run_id = 0
-    for num_shards, k_dtype, d_dtype, init_mode, dim, run_step in itertools.product(
+    for run_id, (num_shards, k_dtype, d_dtype, init_mode, dim, run_step) in enumerate(itertools.product(
         [2],
         keys_dtype_list,
         values_dtype_list,
         ['constant'],
         [1, 10],
         [10],
-    ):
-      run_id += 1
+    ), start=1):
       with ops.Graph().as_default() as g:
         with self.session(graph=g,
-                          config=default_config,
-                          use_gpu=test_util.is_gpu_available()) as sess:
+                                config=default_config,
+                                use_gpu=test_util.is_gpu_available()) as sess:
           test_graph = TestGraph(k_dtype, d_dtype, dim, num_shards, 'var',
                                  'dvar', run_id)
           self.evaluate(variables.global_variables_initializer())
@@ -828,8 +828,9 @@ class VariableTest(test.TestCase):
           self.assertAllCloseAccordingToType(
               prev_var_loss,
               prev_devar_loss,
-              msg='Cond:{},{},{},{},{},{}'.format(num_shards, k_dtype, d_dtype,
-                                                  init_mode, dim, run_step))
+              msg=
+              f'Cond:{num_shards},{k_dtype},{d_dtype},{init_mode},{dim},{run_step}',
+          )
           _write_checkpoint(self, sess)
       with ops.Graph().as_default() as g:
         with self.session(graph=g,
@@ -843,16 +844,18 @@ class VariableTest(test.TestCase):
           var_loss, devar_loss = sess.run([var_loss_name, devar_loss_name])
 
       self.assertAllEqual(prev_keys, keys)
-      self.assertAllCloseAccordingToType(var_loss,
-                                         prev_var_loss,
-                                         msg='Cond:{},{},{},{},{},{}'.format(
-                                             num_shards, k_dtype, d_dtype,
-                                             init_mode, dim, run_step))
-      self.assertAllCloseAccordingToType(devar_loss,
-                                         prev_devar_loss,
-                                         msg='Cond:{},{},{},{},{},{}'.format(
-                                             num_shards, k_dtype, d_dtype,
-                                             init_mode, dim, run_step))
+      self.assertAllCloseAccordingToType(
+          var_loss,
+          prev_var_loss,
+          msg=
+          f'Cond:{num_shards},{k_dtype},{d_dtype},{init_mode},{dim},{run_step}',
+      )
+      self.assertAllCloseAccordingToType(
+          devar_loss,
+          prev_devar_loss,
+          msg=
+          f'Cond:{num_shards},{k_dtype},{d_dtype},{init_mode},{dim},{run_step}',
+      )
 
   def test_fail_to_write_checkpoint_for_loaded_meta_graph(self):
     run_id = 0
@@ -1479,7 +1482,7 @@ class VariableTest(test.TestCase):
     var_sizes = [0, 0]
     self.evaluate(variables.global_variables_initializer())
 
-    while not all(sz > trigger for sz in var_sizes):
+    while any(sz <= trigger for sz in var_sizes):
       self.evaluate(train_op)
       var_sizes = self.evaluate([spv.size() for spv in sparse_vars])
 
@@ -1547,7 +1550,7 @@ class VariableTest(test.TestCase):
 
     var_sizes = [0, 0]
 
-    while not all(sz > trigger for sz in var_sizes):
+    while any(sz <= trigger for sz in var_sizes):
       optmz.minimize(lambda: loss_fn(sparse_vars, trainables), var_fn)
       var_sizes = [spv.size() for spv in sparse_vars]
 

@@ -51,7 +51,7 @@ def get_project_name_version():
   project_name = "tensorflow-recommenders-addons"
   version["tf_project_name"] = "tensorflow"
   if os.getenv("TF_NEED_CUDA", "0") == "1":
-    project_name = project_name + "-gpu"
+    project_name += "-gpu"
     version["tf_project_name"] = "tensorflow-gpu"
 
   if "--nightly" in sys.argv:
@@ -91,12 +91,12 @@ setup(
     author_email="opensource@google.com",
     packages=find_packages(),
     ext_modules=get_ext_modules(),
-    install_requires=Path("requirements.txt").read_text().splitlines() +
-    ["{}=={}".format(tf_project_name, min_tf_version)],
+    install_requires=(Path("requirements.txt").read_text().splitlines() +
+                      [f"{tf_project_name}=={min_tf_version}"]),
     extras_require={
-        "tensorflow": ["tensorflow=={}".format(min_tf_version)],
-        "tensorflow-gpu": ["tensorflow-gpu=={}".format(min_tf_version)],
-        "tensorflow-cpu": ["tensorflow-cpu=={}".format(min_tf_version)],
+        "tensorflow": [f"tensorflow=={min_tf_version}"],
+        "tensorflow-gpu": [f"tensorflow-gpu=={min_tf_version}"],
+        "tensorflow-cpu": [f"tensorflow-cpu=={min_tf_version}"],
     },
     include_package_data=True,
     zip_safe=False,

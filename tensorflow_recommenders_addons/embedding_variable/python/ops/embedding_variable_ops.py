@@ -153,8 +153,7 @@ class EmbeddingVariable(resource_variable_ops.ResourceVariable,
                            invalid_key=invalid_key)
 
   def __repr__(self):
-    return "<tf.EmbeddingVariable '%s' embedding dim=%s ktype=%s vtype=%s>" % (
-        self.name, self.shape, self._ktype.name, self.dtype.name)
+    return f"<tf.EmbeddingVariable '{self.name}' embedding dim={self.shape} ktype={self._ktype.name} vtype={self.dtype.name}>"
 
   # LINT.IfChange
   # _VariableFromResource inherits from EmbeddingVariable but
@@ -236,9 +235,9 @@ class EmbeddingVariable(resource_variable_ops.ResourceVariable,
     with ops.init_scope():
       self._in_graph_mode = not context.executing_eagerly()
       with ops.name_scope(name,
-                          "EmbeddingVariable",
-                          [] if init_from_fn else [initial_value],
-                          skip_on_eager=False) as name:
+                              "EmbeddingVariable",
+                              [] if init_from_fn else [initial_value],
+                              skip_on_eager=False) as name:
         # pylint: disable=protected-access
         self._invalid_key = invalid_key
         self._ktype = ktype
@@ -257,7 +256,7 @@ class EmbeddingVariable(resource_variable_ops.ResourceVariable,
         device_context_manager = (ops.device if self._in_graph_mode else
                                   ops.NullContextmanager)
         attr = attr_value_pb2.AttrValue(list=attr_value_pb2.AttrValue.ListValue(
-            s=[compat.as_bytes("loc:@%s" % handle_name)]))
+            s=[compat.as_bytes(f"loc:@{handle_name}")]))
         with ops.get_default_graph()._attr_scope({"_class": attr}):
           with ops.name_scope("Initializer"), device_context_manager(None):
             if init_from_fn:
@@ -294,8 +293,8 @@ class EmbeddingVariable(resource_variable_ops.ResourceVariable,
           if initial_value is not None:
             # pylint: disable=g-backslash-continuation
             with ops.name_scope("Initialize") as n, \
-                 ops.colocate_with(None, ignore_existing=True), \
-                 ops.device(handle.device):
+                   ops.colocate_with(None, ignore_existing=True), \
+                   ops.device(handle.device):
               # pylint: disable=protected-access
               initializer_op = (gen_ev_ops.initialize_ev_op(
                   handle,
@@ -304,8 +303,6 @@ class EmbeddingVariable(resource_variable_ops.ResourceVariable,
                   ops.convert_to_tensor(invalid_key, dtype=self._ktype),
                   shape=initial_value.get_shape(),
                   name=n))
-          cached_value = None
-          graph_element = None
         else:
           gen_ev_ops.initialize_ev_op(handle,
                                       initial_value,
@@ -314,9 +311,8 @@ class EmbeddingVariable(resource_variable_ops.ResourceVariable,
                                       shape=initial_value.get_shape())
           self._ev_is_initialized_op = None
           initializer_op = None
-          graph_element = None
-          cached_value = None
-
+        graph_element = None
+        cached_value = None
         if not context.executing_eagerly():
           # Eager variables are only added to collections if they are part of an
           # eager variable store (otherwise in an interactive session they would
@@ -349,8 +345,8 @@ class EmbeddingVariable(resource_variable_ops.ResourceVariable,
 
     tensors = gen_ev_ops.ev_export(self.handle, Tkey=self._ktype, Tvalue=vtype)
     self.specs = [
-        BaseSaverBuilder.SaveSpec(tensors[0], "", name + "-keys"),
-        BaseSaverBuilder.SaveSpec(tensors[1], "", name + "-values"),
+        BaseSaverBuilder.SaveSpec(tensors[0], "", f"{name}-keys"),
+        BaseSaverBuilder.SaveSpec(tensors[1], "", f"{name}-values"),
     ]
 
   def restore(self, restored_tensors, restored_shapes):
@@ -469,25 +465,25 @@ class EmbeddingVariable(resource_variable_ops.ResourceVariable,
     """
     if context.executing_eagerly():
       raise RuntimeError("to_proto not supported in EAGER mode.")
-    if export_scope is None or self.handle.name.startswith(export_scope):
-      var_def = variable_pb2.VariableDef()
-      var_def.variable_name = ops.strip_name_scope(self.handle.name,
-                                                   export_scope)
-      var_def.initializer_name = ops.strip_name_scope(self.initializer.name,
-                                                      export_scope)
-      if self._initial_value is not None:
-        var_def.initial_value_name = ops.strip_name_scope(
-            self._initial_value.name, export_scope)
-      if self._cached_value is not None:
-        var_def.snapshot_name = ops.strip_name_scope(self._cached_value.name,
-                                                     export_scope)
-      var_def.is_resource = True
-      if self._save_slice_info:
-        var_def.save_slice_info_def.MergeFrom(
-            self._save_slice_info.to_proto(export_scope=export_scope))
-      return var_def
-    else:
+    if export_scope is not None and not self.handle.name.startswith(
+        export_scope):
       return None
+    var_def = variable_pb2.VariableDef()
+    var_def.variable_name = ops.strip_name_scope(self.handle.name,
+                                                 export_scope)
+    var_def.initializer_name = ops.strip_name_scope(self.initializer.name,
+                                                    export_scope)
+    if self._initial_value is not None:
+      var_def.initial_value_name = ops.strip_name_scope(
+          self._initial_value.name, export_scope)
+    if self._cached_value is not None:
+      var_def.snapshot_name = ops.strip_name_scope(self._cached_value.name,
+                                                   export_scope)
+    var_def.is_resource = True
+    if self._save_slice_info:
+      var_def.save_slice_info_def.MergeFrom(
+          self._save_slice_info.to_proto(export_scope=export_scope))
+    return var_def
 
   @staticmethod
   def from_proto(variable_def, import_scope=None):

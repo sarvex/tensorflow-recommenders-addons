@@ -29,15 +29,14 @@ from tensorflow_recommenders_addons.embedding_variable.python.ops import embeddi
 class GradientDescentOptimizer(gradient_descent.GradientDescentOptimizer):
 
   def _resource_apply_sparse_duplicate_indices(self, grad, handle, indices):
-    if isinstance(handle, embedding_variable_ops.EmbeddingVariable):
-      global_step = training_util.get_or_create_global_step()
-      return gen_ev_ops.ev_sparse_apply_gradient_descent(
-          handle.handle,
-          math_ops.cast(self._learning_rate_tensor, grad.dtype.base_dtype),
-          grad,
-          indices,
-          global_step,
-          use_locking=self._use_locking)
-    else:
+    if not isinstance(handle, embedding_variable_ops.EmbeddingVariable):
       return resource_variable_ops.resource_scatter_add(
           handle.handle, indices, -grad * self._learning_rate)
+    global_step = training_util.get_or_create_global_step()
+    return gen_ev_ops.ev_sparse_apply_gradient_descent(
+        handle.handle,
+        math_ops.cast(self._learning_rate_tensor, grad.dtype.base_dtype),
+        grad,
+        indices,
+        global_step,
+        use_locking=self._use_locking)

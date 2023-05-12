@@ -43,17 +43,19 @@ class CuckooHashtableTest(test.TestCase):
     for dev_str, use_gpu, init_size, expect_size in test_list:
       with self.session(use_gpu=use_gpu, config=default_config):
         with self.captureWritesToStream(sys.stderr) as printed:
-          table = de.get_variable("2021-" + str(id),
-                                  dtypes.int64,
-                                  dtypes.int32,
-                                  initializer=0,
-                                  dim=8,
-                                  init_size=init_size)
+          table = de.get_variable(
+              f"2021-{str(id)}",
+              dtypes.int64,
+              dtypes.int32,
+              initializer=0,
+              dim=8,
+              init_size=init_size,
+          )
           self.evaluate(table.size())
         id += 1
         self.assertTrue("I" in printed.contents())
         self.assertTrue(dev_str in printed.contents())
-        self.assertTrue("_size={}".format(expect_size) in printed.contents())
+        self.assertTrue(f"_size={expect_size}" in printed.contents())
 
 
 if __name__ == "__main__":

@@ -133,8 +133,8 @@ def DynamicEmbeddingOptimizer(self, bp_v2=None):
     update_ops = []
     with backend.name_scope(name or self._name):
       for grad, var in grads_and_vars:
-        scope_name = ("update" if ops.executing_eagerly_outside_functions() else
-                      "update_" + var.op.name)
+        scope_name = ("update" if ops.executing_eagerly_outside_functions()
+                      else f"update_{var.op.name}")
         # Colocate the update with variables to avoid unnecessary communication
         # delays. See b/136304694.
         with backend.name_scope(
@@ -180,10 +180,7 @@ def DynamicEmbeddingOptimizer(self, bp_v2=None):
                                    var._shared_name, self._bp_v2)
         else:
           weight = variables.Variable(
-              name="%s/%s" % (
-                  var._shared_name,
-                  slot_name,
-              ),  # pylint: disable=protected-access
+              name=f"{var._shared_name}/{slot_name}",
               dtype=var.dtype,
               trainable=False,
               initial_value=initial_value,
@@ -295,7 +292,7 @@ def create_slots(primary, init, slot_name, op_name, bp_v2):
   params_var_, params_ids_ = primary.params, primary.ids
 
   scope_store = variable_scope._get_default_variable_store()
-  full_name = params_var_.name + "/" + op_name + "/" + slot_name
+  full_name = f"{params_var_.name}/{op_name}/{slot_name}"
   if full_name not in scope_store._vars:
     with ops.colocate_with(primary, ignore_existing=True):
       slot_variable_ = de.Variable(
@@ -316,7 +313,7 @@ def create_slots(primary, init, slot_name, op_name, bp_v2):
 
   slot_trainable = None
   if context.executing_eagerly():
-    slot_tw_name = slot_name + '-' + str(optimizer_v2._var_key(primary))
+    slot_tw_name = f'{slot_name}-{str(optimizer_v2._var_key(primary))}'
   else:
     # In graph mode of former version, It only uses slot_name as name to
     # trainable wrappers of slots. So here set it the name to slot_name

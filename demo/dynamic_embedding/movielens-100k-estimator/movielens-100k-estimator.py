@@ -28,8 +28,7 @@ def input_fn():
   shuffled = ratings.shuffle(1_000_000,
                              seed=2021,
                              reshuffle_each_iteration=False)
-  dataset = shuffled.batch(256)
-  return dataset
+  return shuffled.batch(256)
 
 
 def model_fn(features, labels, mode, params):
@@ -42,8 +41,7 @@ def model_fn(features, labels, mode, params):
 
   if is_training:
     ps_list = [
-        "/job:ps/replica:0/task:{}/CPU:0".format(i)
-        for i in range(params["ps_num"])
+        f"/job:ps/replica:0/task:{i}/CPU:0" for i in range(params["ps_num"])
     ]
     initializer = tf.keras.initializers.RandomNormal(-1, 1)
   else:

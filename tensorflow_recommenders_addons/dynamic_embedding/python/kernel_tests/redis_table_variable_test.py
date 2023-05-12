@@ -139,9 +139,7 @@ def model_fn(sparse_vars, embed_dim, feature_inputs):
     dnn_fn = layers.Dense(dimension, use_bias=False)
     batch_normal_fn = layers.BatchNormalization()
     dnn_result = dnn_fn(entry)
-    if activation:
-      return batch_normal_fn(nn.selu(dnn_result))
-    return dnn_result
+    return batch_normal_fn(nn.selu(dnn_result)) if activation else dnn_result
 
   def dnn_fn(entry, dimension, activation=False):
     hidden = layer_fn(entry, dimension, activation)
@@ -236,7 +234,7 @@ def _random_weights(
                                                       stddev=1.0 /
                                                       math.sqrt(vocab_size),
                                                       dtype=dtypes.float32)
-  embedding_weights = de.get_variable(
+  return de.get_variable(
       key_dtype=key_dtype,
       value_dtype=value_dtype,
       devices=_get_devices() * num_shards,
@@ -244,7 +242,6 @@ def _random_weights(
       initializer=initializer,
       dim=embed_dim,
   )
-  return embedding_weights
 
 
 def _test_dir(temp_dir, test_name):
@@ -259,7 +256,7 @@ def _test_dir(temp_dir, test_name):
     """
   test_dir = os.path.join(temp_dir, test_name)
   if os.path.isdir(test_dir):
-    for f in glob.glob("%s/*" % test_dir):
+    for f in glob.glob(f"{test_dir}/*"):
       os.remove(f)
   else:
     os.makedirs(test_dir)
@@ -277,7 +274,7 @@ def _create_dynamic_shape_tensor(
   def _func():
     length = np.random.randint(min_len, max_len)
     tensor = np.random.randint(min_val, max_val, max_len, dtype=dtype)
-    tensor = np.array(tensor[0:length], dtype=dtype)
+    tensor = np.array(tensor[:length], dtype=dtype)
     return tensor
 
   return _func
@@ -305,8 +302,8 @@ redis_config = de.RedisTableConfig(redis_config_abs_dir=redis_config_path)
 
 
 def _redis_health_check(redis_host_ip="127.0.0.1", redis_host_port=6379):
-  ping_return = os.popen('redis-cli -h ' + redis_host_ip + ' -p ' +
-                         str(redis_host_port) + ' ping').read()
+  ping_return = os.popen(
+      f'redis-cli -h {redis_host_ip} -p {str(redis_host_port)} ping').read()
   return ping_return == 'PONG\n'
 
 
@@ -356,7 +353,7 @@ class RedisVariableTest(test.TestCase):
     for (key_dtype, value_dtype), dim in itertools.product(kv_list, dim_list):
       id += 1
       with self.session(config=default_config,
-                        use_gpu=test_util.is_gpu_available()) as sess:
+                            use_gpu=test_util.is_gpu_available()) as sess:
         keys = constant_op.constant(
             np.array([0, 1, 2, 3]).astype(_type_converter(key_dtype)),
             key_dtype)
@@ -364,12 +361,13 @@ class RedisVariableTest(test.TestCase):
             _convert([[0] * dim, [1] * dim, [2] * dim, [3] * dim], value_dtype),
             value_dtype)
         table = de.get_variable(
-            't1-' + str(id) + '_test_variable',
+            f't1-{id}_test_variable',
             key_dtype=key_dtype,
             value_dtype=value_dtype,
             initializer=np.array([-1]).astype(_type_converter(value_dtype)),
             dim=dim,
-            kv_creator=de.RedisTableCreator(config=redis_config))
+            kv_creator=de.RedisTableCreator(config=redis_config),
+        )
 
         table.clear()
 
@@ -510,24 +508,25 @@ class RedisVariableTest(test.TestCase):
         (init_ops.random_normal_initializer(0.0, 0.01, seed=2), 0.0, 0.01),
     ]:
       with self.session(config=default_config,
-                        use_gpu=test_util.is_gpu_available()):
+                            use_gpu=test_util.is_gpu_available()):
         id += 1
         keys = constant_op.constant(list(range(2**16)), dtypes.int64)
         table = de.get_variable(
-            "t1" + str(id) + '_test_variable_initializer',
+            f"t1{id}_test_variable_initializer",
             key_dtype=dtypes.int64,
             value_dtype=dtypes.float32,
             initializer=initializer,
             dim=10,
-            kv_creator=de.RedisTableCreator(config=redis_config))
+            kv_creator=de.RedisTableCreator(config=redis_config),
+        )
         table.clear()
         vals_op = table.lookup(keys)
         mean = self.evaluate(math_ops.reduce_mean(vals_op))
         stddev = self.evaluate(math_ops.reduce_std(vals_op))
         rtol = 2e-5
         atol = rtol
-        self.assertAllClose(target_mean, mean, rtol, atol)
-        self.assertAllClose(target_stddev, stddev, rtol, atol)
+        self.assertAllClose(target_mean, mean, atol, atol)
+        self.assertAllClose(target_stddev, stddev, atol, atol)
         table.clear()
 
   def test_save_restore(self):
@@ -727,12 +726,13 @@ class RedisVariableTest(test.TestCase):
                                stateful=True)
 
       params = de.get_variable(
-          name="params-test-0915-" + str(id) + '_test_training_save_restore',
+          name=f"params-test-0915-{id}_test_training_save_restore",
           key_dtype=key_dtype,
           value_dtype=value_dtype,
           initializer=init_ops.random_normal_initializer(0.0, 0.01),
           dim=dim,
-          kv_creator=de.RedisTableCreator(config=redis_config))
+          kv_creator=de.RedisTableCreator(config=redis_config),
+      )
       self.evaluate(params.clear())
       params_size = self.evaluate(params.size())
 
@@ -838,13 +838,13 @@ class RedisVariableTest(test.TestCase):
                                stateful=True)
 
       params = de.get_variable(
-          name="params-test-0916-" + str(id) +
-          '_test_training_save_restore_by_files',
+          name=f"params-test-0916-{id}_test_training_save_restore_by_files",
           key_dtype=key_dtype,
           value_dtype=value_dtype,
           initializer=0,
           dim=dim,
-          kv_creator=de.RedisTableCreator(config=redis_config_modify))
+          kv_creator=de.RedisTableCreator(config=redis_config_modify),
+      )
 
       _, var0 = de.embedding_lookup(params,
                                     ids,
@@ -1555,7 +1555,7 @@ class RedisVariableTest(test.TestCase):
     var_sizes = [0, 0]
     self.evaluate(variables.global_variables_initializer())
 
-    while not all(sz > trigger for sz in var_sizes):
+    while any(sz <= trigger for sz in var_sizes):
       self.evaluate(train_op)
       var_sizes = self.evaluate([spv.size() for spv in sparse_vars])
 
@@ -1635,7 +1635,7 @@ class RedisVariableTest(test.TestCase):
 
     var_sizes = [0, 0]
 
-    while not all(sz > trigger for sz in var_sizes):
+    while any(sz <= trigger for sz in var_sizes):
       optmz.minimize(lambda: loss_fn(sparse_vars, trainables), var_fn)
       var_sizes = [spv.size() for spv in sparse_vars]
 
@@ -1702,9 +1702,7 @@ class RedisVariableTest(test.TestCase):
         "model_lib_abs_dir": save_path
     }
 
-    id = 0
-    for key in list(redis_config_params_raw_config.keys()):
-      id += 1
+    for id, key in enumerate(list(redis_config_params_raw_config.keys()), start=1):
       redis_config_params_modify = copy.deepcopy(redis_config_params_raw_config)
       if type(redis_config_params_raw_config[key]) != type(''):
         redis_config_params_modify[key] = str(
@@ -1718,11 +1716,13 @@ class RedisVariableTest(test.TestCase):
             redis_config_abs_dir=redis_config_path)
 
       with self.session(config=default_config,
-                        use_gpu=test_util.is_gpu_available()) as sess:
+                            use_gpu=test_util.is_gpu_available()) as sess:
         with self.assertRaisesOpError(key):
-          table = de.get_variable('tConfig-' + str(id) + '_test_variable',
-                                  kv_creator=de.RedisTableCreator(
-                                      config=redis_config_modify_wrong_type))
+          table = de.get_variable(
+              f'tConfig-{str(id)}_test_variable',
+              kv_creator=de.RedisTableCreator(
+                  config=redis_config_modify_wrong_type),
+          )
 
   def test_unable_connect_to_redis(self):
     if _redis_health_check(redis_config_params["redis_host_ip"][0],
@@ -1755,11 +1755,12 @@ class RedisVariableTest(test.TestCase):
           redis_config_abs_dir=redis_config_path)
 
     with self.session(config=default_config,
-                      use_gpu=test_util.is_gpu_available()) as sess:
+                        use_gpu=test_util.is_gpu_available()) as sess:
       with self.assertRaisesOpError("Exit without any Redis connection"):
-        table = de.get_variable('tWrongIP-' + str(id) + '_test_variable',
-                                kv_creator=de.RedisTableCreator(
-                                    config=redis_config_modify_wrong_ip))
+        table = de.get_variable(
+            f'tWrongIP-{id}_test_variable',
+            kv_creator=de.RedisTableCreator(config=redis_config_modify_wrong_ip),
+        )
         self.evaluate(table.size())
 
 

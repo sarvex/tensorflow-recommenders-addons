@@ -18,6 +18,7 @@ Dynamic Embedding is designed for Large-scale Sparse Weights Training.
 See [Sparse Domain Isolation](https://github.com/tensorflow/community/pull/237)
 """
 
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -38,8 +39,6 @@ try:
   from tensorflow.python.keras.initializers import initializers_v2 as kinit2
 except ImportError:
   kinit2 = None
-  pass  # for compatible with TF < 2.3.x
-
 from tensorflow.python.client import device_lib
 from tensorflow.python.eager import context
 from tensorflow.python.framework import constant_op
@@ -243,7 +242,7 @@ class Variable(base.Trackable):
           for x in device_lib.list_local_devices()
           if x.device_type == "GPU"
       ]
-      return gpu_list[0:1] or [
+      return gpu_list[:1] or [
           "/CPU:0",
       ]
 
@@ -348,8 +347,7 @@ class Variable(base.Trackable):
     return init
 
   def _make_name(self, table_idx):
-    return "{}_mht_{}of{}".format(self.name.replace("/", "_"), table_idx + 1,
-                                  self.shard_num)
+    return f'{self.name.replace("/", "_")}_mht_{table_idx + 1}of{self.shard_num}'
 
   def upsert(self, keys, values, name=None):
     """Insert or Update `keys` with `values`.
@@ -451,9 +449,8 @@ class Variable(base.Trackable):
     """
     if self._restrict_policy is not None:
       return self._restrict_policy.apply_restriction(num_reserved, **kwargs)
-    else:
-      tf_logging.warning('Call restrict without setting restrict policy.')
-      return None
+    tf_logging.warning('Call restrict without setting restrict policy.')
+    return None
 
   def remove(self, keys, name=None):
     """Removes `keys` and its associated values from the variable.
@@ -503,11 +500,11 @@ class Variable(base.Trackable):
       keys_shape = array_ops.shape(array_ops.reshape(keys, [-1]))
       vals_shape = [keys_shape[0], self.dim]
       init_op = self.initializer(vals_shape)
-    except Exception as e:  # constant.initializer
+    except Exception as e:# constant.initializer
       init_op = self.initializer([self.dim])
       tf_logging.warn(
-          "Variable [{}] is not running on full-size initialization mode: {}".
-          format(str(self.name), str(e)))
+          f"Variable [{str(self.name)}] is not running on full-size initialization mode: {str(e)}"
+      )
     return init_op
 
   def lookup(self, keys, return_exists=False, name=None):
@@ -558,11 +555,8 @@ class Variable(base.Trackable):
         else:
           _values.append(ops_)
 
-    if return_exists:
-      result = (_stitch(_values, keys_indices), _stitch(_exists, keys_indices))
-    else:
-      result = _stitch(_values, keys_indices)
-    return result
+    return ((_stitch(_values, keys_indices), _stitch(_exists, keys_indices))
+            if return_exists else _stitch(_values, keys_indices))
 
   def export(self, name=None):
     """Returns tensors of all keys and values in the table.
@@ -620,7 +614,7 @@ class Variable(base.Trackable):
       List of slot `Variable`s in optimizer.
     """
     if not isinstance(optimizer, (Optimizer, OptimizerV2)):
-      raise TypeError('Expect an optimizer, but get {}'.format(type(optimizer)))
+      raise TypeError(f'Expect an optimizer, but get {type(optimizer)}')
     slots = []
     snames = optimizer.get_slot_names()
     for tw in self._trainable_store.values():
@@ -642,14 +636,13 @@ class Variable(base.Trackable):
                                 state_callback=lambda: self.name,
                                 restore_callback=lambda name: None)
       }
-    else:
-      saveables = dict()
-      for table in self._tables:
-        saveable_dict = table._gather_saveables_for_checkpoint()
-        for (_, saveable) in saveable_dict.items():
-          # merge all tables saveable to one dict with their own name.
-          saveables[saveable.keywords["name"]] = saveable
-      return saveables
+    saveables = {}
+    for table in self._tables:
+      saveable_dict = table._gather_saveables_for_checkpoint()
+      for (_, saveable) in saveable_dict.items():
+        # merge all tables saveable to one dict with their own name.
+        saveables[saveable.keywords["name"]] = saveable
+    return saveables
 
 
 @tf_export("dynamic_embedding.get_variable")
@@ -715,15 +708,13 @@ def get_variable(
     Returns:
       A `Variable` object.
     """
-  var_ = None
   scope = variable_scope.get_variable_scope()
   scope_store = variable_scope._get_default_variable_store()
-  full_name = scope.name + "/" + name if scope.name else name
+  full_name = f"{scope.name}/{name}" if scope.name else name
+  var_ = None
   if full_name in scope_store._vars:
     if scope.reuse is False:
-      err_msg = ("Variable %s already exists, disallowed."
-                 " Did you mean to set reuse=True or "
-                 "reuse=tf.AUTO_REUSE in VarScope?" % full_name)
+      err_msg = f"Variable {full_name} already exists, disallowed. Did you mean to set reuse=True or reuse=tf.AUTO_REUSE in VarScope?"
 
       raise ValueError(err_msg)
   else:

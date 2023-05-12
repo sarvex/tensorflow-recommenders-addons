@@ -58,7 +58,7 @@ flags.DEFINE_string("site_path", "recommenders-addons/api_docs/python",
 
 def main(argv):
   if argv[1:]:
-    raise ValueError("Unrecognized arguments: {}".format(argv[1:]))
+    raise ValueError(f"Unrecognized arguments: {argv[1:]}")
 
   if FLAGS.code_url_prefix:
     code_url_prefix = FLAGS.code_url_prefix

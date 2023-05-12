@@ -53,8 +53,7 @@ from tensorflow.python.training import training_util
 def _simple_loss(embedding):
   x = constant_op.constant(np.random.rand(2, 3), dtype=dtypes.float32)
   pred = math_ops.matmul(embedding, x)
-  loss = pred * pred
-  return loss
+  return pred * pred
 
 
 default_config = config_pb2.ConfigProto(

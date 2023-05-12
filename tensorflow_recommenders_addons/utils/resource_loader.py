@@ -52,14 +52,10 @@ def get_devices(device_type="GPU"):
   elif hasattr(tf.config, "experimental_list_devices"):
     # for compatible with TensorFlow1.x
     devices_list = tf.config.experimental_list_devices()
-    return [d for d in devices_list if ":{}".format(device_type.upper()) in d]
+    return [d for d in devices_list if f":{device_type.upper()}" in d]
   else:
     warnings.warn(
-        "You are currently using TensorFlow {} which TFRA cann't get the devices correctly.\n"
-        "So we strongly recommend that you use the version supported by the TFRA statement "
-        "To do that, refer to the readme: "
-        "https://github.com/tensorflow/recommenders-addons"
-        "".format(tf.__version__,),
+        f"You are currently using TensorFlow {tf.__version__} which TFRA cann't get the devices correctly.\nSo we strongly recommend that you use the version supported by the TFRA statement To do that, refer to the readme: https://github.com/tensorflow/recommenders-addons",
         UserWarning,
     )
     return []
@@ -108,31 +104,7 @@ class LazySO:
       return
     required_tf_version = get_required_tf_version()
     warnings.warn(
-        "You are currently using TensorFlow {} and trying to load a custom op ({})."
-        "\n"
-        "TFRA has compiled its custom ops against TensorFlow {}, "
-        "and there are no compatibility guarantees between the two versions. "
-        "\n"
-        "This means that you might get 'Symbol not found' when loading the custom op, "
-        "or other kind of low-level errors.\n If you do, do not file an issue "
-        "on Github. This is a known limitation."
-        "\n\n"
-        "You can also change the TensorFlow version installed on your system. "
-        "You would need a TensorFlow version equal to {}. \n"
-        "Note that nightly versions of TensorFlow, "
-        "as well as non-pip TensorFlow like `conda install tensorflow` or compiled "
-        "from source are not supported."
-        "\n\n"
-        "The last solution is to compile the TensorFlow Recommenders-Addons "
-        "with the TensorFlow installed on your system. "
-        "To do that, refer to the readme: "
-        "https://github.com/tensorflow/recommenders-addons"
-        "".format(
-            tf.__version__,
-            self.relative_path,
-            required_tf_version,
-            required_tf_version,
-        ),
+        f"You are currently using TensorFlow {tf.__version__} and trying to load a custom op ({self.relative_path}).\nTFRA has compiled its custom ops against TensorFlow {required_tf_version}, and there are no compatibility guarantees between the two versions. \nThis means that you might get 'Symbol not found' when loading the custom op, or other kind of low-level errors.\n If you do, do not file an issue on Github. This is a known limitation.\n\nYou can also change the TensorFlow version installed on your system. You would need a TensorFlow version equal to {required_tf_version}. \nNote that nightly versions of TensorFlow, as well as non-pip TensorFlow like `conda install tensorflow` or compiled from source are not supported.\n\nThe last solution is to compile the TensorFlow Recommenders-Addons with the TensorFlow installed on your system. To do that, refer to the readme: https://github.com/tensorflow/recommenders-addons",
         UserWarning,
     )
     abi_warning_already_raised = True
@@ -163,5 +135,4 @@ def prefix_op_name(op_name):
 
 
 def get_tf_version_triple():
-  tf_version_triple = tf.__version__.split(".")
-  return tf_version_triple
+  return tf.__version__.split(".")

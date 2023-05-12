@@ -102,9 +102,9 @@ class RestrictPolicy(object):
       elif isinstance(_s, de.Variable):
         params = _s
       else:
-        raise TypeError('slots should be dynamic_embedding.TrainableWrapper'
-                        'or dynamic_embedding.Variable. But get {}'.format(
-                            type(_s)))
+        raise TypeError(
+            f'slots should be dynamic_embedding.TrainableWrapperor dynamic_embedding.Variable. But get {type(_s)}'
+        )
       # TODO(Lifann) Use unique identifier instead of Python id().
       id_collection = [id(p) for p in self.params_in_slots]
       if id(params) not in id_collection:
@@ -129,18 +129,11 @@ class TimestampRestrictPolicy(RestrictPolicy):
     """
     super(TimestampRestrictPolicy, self).__init__(var)
     scope = variable_scope.get_variable_scope()
-    if scope.name:
-      tstp_scope = scope.name + '/status'
-    else:
-      tstp_scope = 'status'
-    tstp_name = self.var.name + '/timestamp'
+    tstp_scope = f'{scope.name}/status' if scope.name else 'status'
+    tstp_name = f'{self.var.name}/timestamp'
 
     with ops.name_scope(tstp_scope, 'status', []) as unique_scope:
-      if unique_scope:
-        full_name = unique_scope + tstp_name
-      else:
-        full_name = tstp_name
-
+      full_name = unique_scope + tstp_name if unique_scope else tstp_name
       self.tstp_var = de.get_variable(full_name,
                                       key_dtype=self.var.key_dtype,
                                       value_dtype=dtypes.int32,
@@ -170,8 +163,7 @@ class TimestampRestrictPolicy(RestrictPolicy):
     )
     fresh_tstp = math_ops.cast(fresh_tstp, dtypes.int32)
     fresh_tstp = array_ops.reshape(fresh_tstp, (-1, 1))
-    update_tstp_op = self.tstp_var.upsert(keys, fresh_tstp)
-    return update_tstp_op
+    return self.tstp_var.upsert(keys, fresh_tstp)
 
   def apply_restriction(self, num_reserved, **kwargs):
     """
@@ -219,8 +211,8 @@ class TimestampRestrictPolicy(RestrictPolicy):
         removed_keys = array_ops.gather(partial_keys, removed_key_indices)
         restrict_var_ops.append(self.var.tables[i].remove(removed_keys))
         restrict_status_ops.append(self.tstp_var.tables[i].remove(removed_keys))
-        for slot_param in self.params_in_slots:
-          restrict_slot_ops.append(slot_param.tables[i].remove(removed_keys))
+        restrict_slot_ops.extend(slot_param.tables[i].remove(removed_keys)
+                                 for slot_param in self.params_in_slots)
     return control_flow_ops.group(restrict_var_ops, restrict_status_ops,
                                   restrict_slot_ops)
 
@@ -248,18 +240,11 @@ class FrequencyRestrictPolicy(RestrictPolicy):
     self.init_count = constant_op.constant(0, dtypes.int32)
 
     scope = variable_scope.get_variable_scope()
-    if scope.name:
-      freq_scope = scope.name + '/status'
-    else:
-      freq_scope = 'status'
-    freq_name = self.var.name + '/frequency'
+    freq_scope = f'{scope.name}/status' if scope.name else 'status'
+    freq_name = f'{self.var.name}/frequency'
 
     with ops.name_scope(freq_scope, 'status', []) as unique_scope:
-      if unique_scope:
-        full_name = unique_scope + freq_name
-      else:
-        full_name = freq_name
-
+      full_name = unique_scope + freq_name if unique_scope else freq_name
       self.freq_var = de.get_variable(full_name,
                                       key_dtype=self.var.key_dtype,
                                       value_dtype=dtypes.int32,
@@ -348,8 +333,8 @@ class FrequencyRestrictPolicy(RestrictPolicy):
 
         restrict_var_ops.append(self.var.tables[i].remove(removed_keys))
         restrict_status_ops.append(self.freq_var.tables[i].remove(removed_keys))
-        for slot_param in self.params_in_slots:
-          restrict_slot_ops.append(slot_param.tables[i].remove(removed_keys))
+        restrict_slot_ops.extend(slot_param.tables[i].remove(removed_keys)
+                                 for slot_param in self.params_in_slots)
     return control_flow_ops.group(restrict_var_ops, restrict_status_ops,
                                   restrict_slot_ops)
 

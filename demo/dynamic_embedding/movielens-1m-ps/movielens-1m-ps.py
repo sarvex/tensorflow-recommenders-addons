@@ -29,9 +29,7 @@ class Trainer():
     self.worker_id = worker_id
     self.worker_num = worker_num
     self.batch_size = batch_size
-    self.devices = [
-        "/job:ps/replica:0/task:{}".format(idx) for idx in range(ps_num)
-    ]
+    self.devices = [f"/job:ps/replica:0/task:{idx}" for idx in range(ps_num)]
     self.ckpt_dir = ckpt_dir
     if self.ckpt_dir:
       os.makedirs(os.path.split(self.ckpt_dir)[0], exist_ok=True)
@@ -39,8 +37,8 @@ class Trainer():
   def read_batch(self):
     split_size = int(100 / self.worker_num)
     split_start = split_size * self.worker_id
-    split = 'train[{}%:{}%]'.format(split_start, split_start + split_size - 1)
-    print("dataset split, worker{}: {}".format(self.worker_id, split))
+    split = f'train[{split_start}%:{split_start + split_size - 1}%]'
+    print(f"dataset split, worker{self.worker_id}: {split}")
     ratings = tfds.load("movielens/1m-ratings", split=split)
     ratings = ratings.map(
         lambda x: {
@@ -52,8 +50,7 @@ class Trainer():
                                seed=2021,
                                reshuffle_each_iteration=False)
     dataset_train = shuffled.batch(self.batch_size)
-    train_iter = tf.compat.v1.data.make_initializable_iterator(dataset_train)
-    return train_iter
+    return tf.compat.v1.data.make_initializable_iterator(dataset_train)
 
   def build_graph(self, batch):
     movie_id = batch["movie_id"]
@@ -132,7 +129,7 @@ def start_worker(worker_id, config):
                                 job_name="worker",
                                 task_index=worker_id,
                                 config=sess_config)
-  with tf.compat.v1.device("/job:worker/replica:0/task:{}".format(worker_id)):
+  with tf.compat.v1.device(f"/job:worker/replica:0/task:{worker_id}"):
     trainer = Trainer(worker_id=worker_id,
                       worker_num=num_worker_tasks,
                       ps_num=num_ps_tasks,
@@ -143,18 +140,19 @@ def start_worker(worker_id, config):
 
   device_setter = tf.compat.v1.train.replica_device_setter(
       ps_tasks=num_ps_tasks,
-      worker_device="/job:worker/replica:0/task:{}".format(worker_id),
-      ps_device="/job:ps")
+      worker_device=f"/job:worker/replica:0/task:{worker_id}",
+      ps_device="/job:ps",
+  )
 
   with tf.compat.v1.device(device_setter):
     outputs = trainer.build_graph(train_data)
 
   with tf.compat.v1.train.MonitoredTrainingSession(
-      master=server.target,
-      is_chief=FLAGS.is_chief,
-      checkpoint_dir=trainer.ckpt_dir if FLAGS.is_chief else None,
-      config=sess_config,
-  ) as sess:
+        master=server.target,
+        is_chief=FLAGS.is_chief,
+        checkpoint_dir=trainer.ckpt_dir if FLAGS.is_chief else None,
+        config=sess_config,
+    ) as sess:
     sess.run([train_iter.initializer])
 
     step = 0
@@ -169,7 +167,7 @@ def start_worker(worker_id, config):
           print("[worker{}]step{}:\tloss={:.4f}\t size={}".format(
               worker_id, step, float(_loss), _size))
       except tf.errors.OutOfRangeError:
-        print("[worker{}]no more data!".format(worker_id))
+        print(f"[worker{worker_id}]no more data!")
         break
 
 

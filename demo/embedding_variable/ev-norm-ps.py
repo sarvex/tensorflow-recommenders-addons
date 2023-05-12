@@ -53,28 +53,23 @@ def train(task_index, cluster, is_chief, target, buckets):
   x = tf.placeholder(tf.int64, [1024])
   y_ = tf.placeholder(tf.float32, [None, 10])
   one_hot_label = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0]
-  labels = []
-  for i in range(1024):
-    labels.append(one_hot_label)
-
+  labels = [one_hot_label for _ in range(1024)]
   available_worker_device = "/job:worker/task:%d" % (task_index)
   with tf.device(
-      tf.train.replica_device_setter(worker_device=available_worker_device,
-                                     cluster=cluster)):
+        tf.train.replica_device_setter(worker_device=available_worker_device,
+                                       cluster=cluster)):
     loss, opt, emb = model_fn(x, y_)
     local_step = 1
     config = tf.ConfigProto(inter_op_parallelism_threads=7)
     with tf.train.MonitoredTrainingSession(master=target,
-                                           is_chief=is_chief,
-                                           hooks=[],
-                                           save_checkpoint_secs=60,
-                                           checkpoint_dir=buckets,
-                                           config=config) as mon_sess:
+                                               is_chief=is_chief,
+                                               hooks=[],
+                                               save_checkpoint_secs=60,
+                                               checkpoint_dir=buckets,
+                                               config=config) as mon_sess:
       #print(ops.get_default_graph().as_graph_def())
       while True:
-        fe = []
-        for i in range(1024):
-          fe.append(random.randint(1, 100000000))
+        fe = [random.randint(1, 100000000) for _ in range(1024)]
         l, m, emb2 = mon_sess.run([loss, opt, emb],
                                   feed_dict={
                                       x: fe,
@@ -87,7 +82,7 @@ def train(task_index, cluster, is_chief, target, buckets):
 
 
 def main(argv):
-  print("job name = %s" % FLAGS.job_name)
+  print(f"job name = {FLAGS.job_name}")
   print("task index = %d" % FLAGS.task_index)
   is_chief = FLAGS.task_index == 0
 

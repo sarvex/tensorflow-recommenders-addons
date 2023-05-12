@@ -29,9 +29,8 @@ class _RawFeature(object):
   def match_category(self, tensor):
     min_code = self.category * ENCODDING_SEGMENT_LENGTH
     max_code = (self.category + 1) * ENCODDING_SEGMENT_LENGTH
-    mask = tf.math.logical_and(tf.greater_equal(tensor, min_code),
+    return tf.math.logical_and(tf.greater_equal(tensor, min_code),
                                tf.less(tensor, max_code))
-    return mask
 
 
 class _StringFeature(_RawFeature):
@@ -95,8 +94,7 @@ def encode_feature(data):
     batch_size = tf.shape(feature)[0]
     feature = tf.reshape(feature, (batch_size, -1))
     collected_features.append(feature)
-  collected_features = tf.concat(collected_features, 1)
-  return collected_features
+  return tf.concat(collected_features, 1)
 
 
 def get_labels(data):
@@ -129,8 +127,7 @@ def initialize_dataset(batch_size=1,
   if skips > 0:
     video_games_data.skip(skips)
   video_games_data = video_games_data.batch(batch_size)
-  iterator = video_games_data.__iter__()
-  return iterator
+  return video_games_data.__iter__()
 
 
 def input_fn(iterator):

@@ -49,8 +49,9 @@ def train(num_steps):
                                      trigger=int(FLAGS.reserved_features * 1.2))
 
       if step % 10 == 0:
-        print('step: {}, loss: {}, var_size: {}, auc: {}'.format(
-            step, loss, model.embedding_store.size(), auc))
+        print(
+            f'step: {step}, loss: {loss}, var_size: {model.embedding_store.size()}, auc: {auc}'
+        )
 
   except tf.errors.OutOfRangeError:
     print('Run out the training data.')
@@ -88,7 +89,7 @@ def test(num_steps):
     preds = tf.cast(tf.round(probabilities), dtype=tf.int32)
     labels = tf.cast(labels, dtype=tf.int32)
     ctr = tf.metrics.Accuracy()(labels, preds)
-    print("step: {}, ctr: {}".format(step, ctr))
+    print(f"step: {step}, ctr: {ctr}")
 
 
 def main(argv):

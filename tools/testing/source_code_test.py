@@ -40,7 +40,7 @@ def test_case_insensitive_filesystems():
   # If it doesn't, we probably computed the wrong directory.
   if not os.path.isdir(os.path.join(BASE_DIR,
                                     "tensorflow_recommenders_addons")):
-    raise AssertionError("BASE_DIR = {} is not project root".format(BASE_DIR))
+    raise AssertionError(f"BASE_DIR = {BASE_DIR} is not project root")
 
   for dirpath, dirnames, filenames in os.walk(BASE_DIR, followlinks=True):
     lowercase_directories = [x.lower() for x in dirnames]
@@ -48,14 +48,15 @@ def test_case_insensitive_filesystems():
 
     lowercase_dir_contents = lowercase_directories + lowercase_files
     if len(lowercase_dir_contents) != len(set(lowercase_dir_contents)):
-      raise AssertionError("Files with same name but different case detected "
-                           "in directory: {}".format(dirpath))
+      raise AssertionError(
+          f"Files with same name but different case detected in directory: {dirpath}"
+      )
 
 
 def get_lines_of_source_code(allowlist=None):
   allowlist = allowlist or []
   source_dir = os.path.join(BASE_DIR, "tensorflow_recommenders_addons")
-  for path in glob.glob(source_dir + "/**/*.py", recursive=True):
+  for path in glob.glob(f"{source_dir}/**/*.py", recursive=True):
     if in_allowlist(path, allowlist):
       continue
     with open(path) as f:
@@ -64,10 +65,7 @@ def get_lines_of_source_code(allowlist=None):
 
 
 def in_allowlist(file_path, allowlist):
-  for allowed_file in allowlist:
-    if file_path.endswith(allowed_file):
-      return True
-  return False
+  return any(file_path.endswith(allowed_file) for allowed_file in allowlist)
 
 
 def test_no_tf_control_dependencies():
@@ -81,15 +79,5 @@ def test_no_tf_control_dependencies():
     if "tf.control_dependencies(" in line:
 
       raise NameError(
-          "The usage of a tf.control_dependencies() function call was found in "
-          "file {} at line {}:\n\n"
-          "   {}\n"
-          "In TensorFlow 2.x, in a function decorated "
-          "with `@tf.function` the dependencies are controlled automatically"
-          " thanks to Autograph. \n"
-          "TensorFlow Recommenders Addons aims to be written with idiomatic TF 2.x code. \n"
-          "As such, using tf.control_dependencies() is not allowed in the codebase. \n"
-          "Decorate your function with @tf.function instead. \n"
-          "You can take a look at \n"
-          "https://github.com/tensorflow/community/blob/master/rfcs/20180918-functions-not-sessions-20.md#program-order-semantics--control-dependencies"
-          "".format(file_path, line_idx, line))
+          f"The usage of a tf.control_dependencies() function call was found in file {file_path} at line {line_idx}:\n\n   {line}\nIn TensorFlow 2.x, in a function decorated with `@tf.function` the dependencies are controlled automatically thanks to Autograph. \nTensorFlow Recommenders Addons aims to be written with idiomatic TF 2.x code. \nAs such, using tf.control_dependencies() is not allowed in the codebase. \nDecorate your function with @tf.function instead. \nYou can take a look at \nhttps://github.com/tensorflow/community/blob/master/rfcs/20180918-functions-not-sessions-20.md#program-order-semantics--control-dependencies"
+      )

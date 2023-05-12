@@ -88,7 +88,7 @@ def _test_dir(temp_dir, test_name):
     """
   test_dir = os.path.join(temp_dir, test_name)
   if os.path.isdir(test_dir):
-    for f in glob.glob("%s/*" % test_dir):
+    for f in glob.glob(f"{test_dir}/*"):
       os.remove(f)
   else:
     os.makedirs(test_dir)
@@ -190,7 +190,7 @@ class CommonTrainableTestV1Base(object):
       test_opt = rmsprop.RMSPropOptimizer(1.0, centered=centered_)
       self.common_minimize_trainable(base_opt,
                                      test_opt,
-                                     name="rmsprop" + str(centered_),
+                                     name=f"rmsprop{str(centered_)}",
                                      bp_v2=False)
 
   @test_util.deprecated_graph_mode_only
@@ -274,7 +274,7 @@ class CommonTrainableTestV1Base(object):
       test_opt = rmsprop.RMSPropOptimizer(1.0, centered=centered_)
       self.common_minimize_trainable(base_opt,
                                      test_opt,
-                                     name="rmsprop" + str(centered_),
+                                     name=f"rmsprop{str(centered_)}",
                                      bp_v2=True)
 
 
@@ -350,15 +350,7 @@ class EmbeddingLookupTrainableV1Test(test.TestCase, CommonTrainableTestV1Base):
     de.enable_train_mode()
     base_opt = de.DynamicEmbeddingOptimizer(base_opt)
     test_opt = de.DynamicEmbeddingOptimizer(test_opt)
-    id = 0
-    for (
-        num_shards,
-        k_dtype,
-        d_dtype,
-        initial_mode,
-        dim,
-        run_step,
-    ) in itertools.product(
+    for id, (num_shards, k_dtype, d_dtype, initial_mode, dim, run_step) in enumerate(itertools.product(
         [1, 2],
         [
             dtypes.int64,
@@ -371,10 +363,9 @@ class EmbeddingLookupTrainableV1Test(test.TestCase, CommonTrainableTestV1Base):
         ],
         [1, 10],
         [10],
-    ):
-      id += 1
+    ), start=1):
       with self.session(use_gpu=test_util.is_gpu_available(),
-                        config=default_config) as sess:
+                            config=default_config) as sess:
         # common define
         raw_init_ids = [0, 1]
         raw_init_vals = np.random.rand(2, dim)
@@ -395,7 +386,7 @@ class EmbeddingLookupTrainableV1Test(test.TestCase, CommonTrainableTestV1Base):
 
         # test graph
         embeddings = de.get_variable(
-            "t2020-" + name + str(id),
+            f"t2020-{name}{str(id)}",
             key_dtype=k_dtype,
             value_dtype=d_dtype,
             devices=_get_devices() * num_shards,
@@ -435,8 +426,8 @@ class EmbeddingLookupTrainableV1Test(test.TestCase, CommonTrainableTestV1Base):
         self.assertAllCloseAccordingToType(
             self.evaluate(base_var)[raw_ids],
             self.evaluate(table_var),
-            msg="Cond:{},{},{},{},{},{}".format(num_shards, k_dtype, d_dtype,
-                                                initial_mode, dim, run_step),
+            msg=
+            f"Cond:{num_shards},{k_dtype},{d_dtype},{initial_mode},{dim},{run_step}",
         )
 
 
@@ -498,9 +489,9 @@ class EmbeddingLookupTrainableV2Test(test.TestCase, CommonTrainableTestV2Base):
       base_opt_val = base_fn()
 
       def test_fn():
-        with ops.Graph().as_default(), self.cached_session():
+        with (ops.Graph().as_default(), self.cached_session()):
           embeddings = de.get_variable(
-              "t2020-v2-" + name + str(id),
+              f"t2020-v2-{name}{id}",
               key_dtype=k_dtype,
               value_dtype=d_dtype,
               devices=_get_devices() * num_shards,
@@ -550,15 +541,7 @@ class EmbeddingLookupUniqueTrainableV1Test(test.TestCase,
     de.enable_train_mode()
     base_opt = de.DynamicEmbeddingOptimizer(base_opt)
     test_opt = de.DynamicEmbeddingOptimizer(test_opt)
-    id = 0
-    for (
-        num_shards,
-        k_dtype,
-        d_dtype,
-        initial_mode,
-        dim,
-        run_step,
-    ) in itertools.product(
+    for id, (num_shards, k_dtype, d_dtype, initial_mode, dim, run_step) in enumerate(itertools.product(
         [1, 2],
         [
             dtypes.int64,
@@ -571,10 +554,9 @@ class EmbeddingLookupUniqueTrainableV1Test(test.TestCase,
         ],
         [1, 10],
         [10],
-    ):
-      id += 1
+    ), start=1):
       with self.session(use_gpu=test_util.is_gpu_available(),
-                        config=default_config) as sess:
+                            config=default_config) as sess:
         # common define
         raw_init_ids = [0, 1, 2, 3, 4]
         raw_init_vals = np.random.rand(5, dim)
@@ -597,7 +579,7 @@ class EmbeddingLookupUniqueTrainableV1Test(test.TestCase,
 
         # test graph
         embeddings = de.get_variable(
-            "t-embedding_lookup_unique-v1-" + name + str(id),
+            f"t-embedding_lookup_unique-v1-{name}{str(id)}",
             key_dtype=k_dtype,
             value_dtype=d_dtype,
             devices=_get_devices() * num_shards,
@@ -636,8 +618,8 @@ class EmbeddingLookupUniqueTrainableV1Test(test.TestCase,
         self.assertAllCloseAccordingToType(
             self.evaluate(base_var)[raw_ids],
             self.evaluate(table_var),
-            msg="Cond:{},{},{},{},{},{}".format(num_shards, k_dtype, d_dtype,
-                                                initial_mode, dim, run_step),
+            msg=
+            f"Cond:{num_shards},{k_dtype},{d_dtype},{initial_mode},{dim},{run_step}",
         )
 
 
@@ -701,7 +683,7 @@ class EmbeddingLookupUniqueTrainableV2Test(test.TestCase,
 
       def test_fn():
         embeddings = de.get_variable(
-            "t2020-v2-" + name + str(id),
+            f"t2020-v2-{name}{id}",
             key_dtype=k_dtype,
             value_dtype=d_dtype,
             devices=_get_devices() * num_shards,
@@ -751,17 +733,9 @@ class EmbeddingLookupSparseTrainableV1Test(test.TestCase,
     de.enable_train_mode()
     base_opt = de.DynamicEmbeddingOptimizer(base_opt)
     test_opt = de.DynamicEmbeddingOptimizer(test_opt)
-    id = 0
     config = config_pb2.ConfigProto()
     config.allow_soft_placement = False
-    for (
-        num_shards,
-        k_dtype,
-        d_dtype,
-        initial_mode,
-        dim,
-        run_step,
-    ) in itertools.product(
+    for id, (num_shards, k_dtype, d_dtype, initial_mode, dim, run_step) in enumerate(itertools.product(
         [1, 2],
         [dtypes.int64],
         [
@@ -772,8 +746,7 @@ class EmbeddingLookupSparseTrainableV1Test(test.TestCase,
         ],
         [1, 10],
         [10],
-    ):
-      id += 1
+    ), start=1):
       raw_init_ids = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
       raw_init_vals = [[
           x,
@@ -821,10 +794,10 @@ class EmbeddingLookupSparseTrainableV1Test(test.TestCase,
 
       # test branch
       with self.session(config=default_config,
-                        use_gpu=test_util.is_gpu_available()) as sess:
+                            use_gpu=test_util.is_gpu_available()) as sess:
         # test var prepare
         embeddings = de.get_variable(
-            "t1030-" + name + str(id),
+            f"t1030-{name}{id}",
             key_dtype=k_dtype,
             value_dtype=d_dtype,
             devices=_get_devices() * num_shards,
@@ -872,8 +845,7 @@ class EmbeddingLookupSparseTrainableV1Test(test.TestCase,
       self.assertAllCloseAccordingToType(
           base_var_val,
           table_var_val,
-          msg="Cond:{},{},{},{},{}".format(num_shards, k_dtype, d_dtype, dim,
-                                           run_step),
+          msg=f"Cond:{num_shards},{k_dtype},{d_dtype},{dim},{run_step}",
       )
 
 
@@ -956,7 +928,7 @@ class EmbeddingLookupSparseTrainableV2Test(test.TestCase,
 
       def test_fn():
         embeddings = de.get_variable(
-            "t1030-v2-" + name + str(id),
+            f"t1030-v2-{name}{id}",
             key_dtype=k_dtype,
             value_dtype=d_dtype,
             devices=_get_devices() * num_shards,
@@ -1075,7 +1047,7 @@ class SafeEmbeddingLookupSparseTrainableV1Test(test.TestCase,
 
         # test var prepare
         embeddings = de.get_variable(
-            "s6030-" + name + str(id),
+            f"s6030-{name}{id}",
             key_dtype=k_dtype,
             value_dtype=d_dtype,
             devices=_get_devices() * num_shards,
@@ -1125,8 +1097,7 @@ class SafeEmbeddingLookupSparseTrainableV1Test(test.TestCase,
         self.assertAllCloseAccordingToType(
             self.evaluate(base_var),
             self.evaluate(table_var),
-            msg="Cond:{},{},{},{},{}".format(num_shards, k_dtype, d_dtype, dim,
-                                             run_step),
+            msg=f"Cond:{num_shards},{k_dtype},{d_dtype},{dim},{run_step}",
         )
 
 
@@ -1210,7 +1181,7 @@ class SafeEmbeddingLookupSparseTrainableV2Test(test.TestCase,
 
       def test_fn():
         embeddings = de.get_variable(
-            "s6030-v2-" + name + str(id),
+            f"s6030-v2-{name}{id}",
             key_dtype=k_dtype,
             value_dtype=d_dtype,
             devices=_get_devices() * num_shards,
@@ -1370,7 +1341,7 @@ class TrainDynamicEmbeddingInMonitoredTrainingSessionTest(test.TestCase):
 
         # test var prepare
         embeddings = de.get_variable(
-            "t1030-" + name + str(id),
+            f"t1030-{name}{id}",
             key_dtype=k_dtype,
             value_dtype=d_dtype,
             devices=_get_devices() * num_shards,
@@ -1417,7 +1388,7 @@ class TrainDynamicEmbeddingInMonitoredTrainingSessionTest(test.TestCase):
                                       shape=[10, dim])
 
         with monitored_session.MonitoredTrainingSession(
-            is_chief=True, config=default_config) as sess:
+                  is_chief=True, config=default_config) as sess:
           sess.run(init_op)
           self.assertAllCloseAccordingToType(
               np.array(raw_init_vals).reshape([len(raw_init_ids), dim]),
@@ -1436,8 +1407,7 @@ class TrainDynamicEmbeddingInMonitoredTrainingSessionTest(test.TestCase):
           self.assertAllCloseAccordingToType(
               sess.run(base_var),
               sess.run(table_var),
-              msg="Cond:{},{},{},{},{}".format(num_shards, k_dtype, d_dtype,
-                                               dim, run_step),
+              msg=f"Cond:{num_shards},{k_dtype},{d_dtype},{dim},{run_step}",
           )
           self.device_check(embeddings)
 
@@ -1481,12 +1451,14 @@ class ModelModeTest(test.TestCase):
     for fn, assign_num, read_num in [(de.enable_train_mode, 1, 2),
                                      (de.enable_inference_mode, 0, 1)]:
       fn()
-      embeddings = de.get_variable('ModeModeTest' + str(assign_num),
-                                   key_dtype=dtypes.int64,
-                                   value_dtype=dtypes.float32,
-                                   devices=_get_devices(),
-                                   initializer=1.,
-                                   dim=8)
+      embeddings = de.get_variable(
+          f'ModeModeTest{str(assign_num)}',
+          key_dtype=dtypes.int64,
+          value_dtype=dtypes.float32,
+          devices=_get_devices(),
+          initializer=1.0,
+          dim=8,
+      )
       ids = constant_op.constant([0, 1, 2, 3, 4], dtype=dtypes.int64)
       test_var, trainable = de.embedding_lookup([embeddings],
                                                 ids,

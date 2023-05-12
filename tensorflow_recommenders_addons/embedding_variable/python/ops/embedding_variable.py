@@ -83,16 +83,14 @@ class _PartitionInfo(object):
 
     if len(var_offset) != len(full_shape):
       raise ValueError(
-          "Expected equal length, but `var_offset` is of length {} while "
-          "full_shape is of length {}.".format(len(var_offset),
-                                               len(full_shape)))
+          f"Expected equal length, but `var_offset` is of length {len(var_offset)} while full_shape is of length {len(full_shape)}."
+      )
 
     for offset, shape in zip(var_offset, full_shape):
       if offset < 0 or offset >= shape:
         raise ValueError(
-            "Expected 0 <= offset < shape but found offset={}, shape={} for "
-            "var_offset={}, full_shape={}".format(offset, shape, var_offset,
-                                                  full_shape))
+            f"Expected 0 <= offset < shape but found offset={offset}, shape={shape} for var_offset={var_offset}, full_shape={full_shape}"
+        )
 
     self._full_shape = full_shape
     self._var_offset = var_offset
@@ -123,9 +121,7 @@ class _PartitionInfo(object):
     single_slice_dim = self.single_slice_dim(shape)
     # If this variable is not being partitioned at all, single_slice_dim() could
     # return None.
-    if single_slice_dim is None:
-      return 0
-    return self.var_offset[single_slice_dim]
+    return 0 if single_slice_dim is None else self.var_offset[single_slice_dim]
 
   def single_slice_dim(self, shape):
     """Returns the slice dim when the variable is partitioned only in one dim.
@@ -151,17 +147,14 @@ class _PartitionInfo(object):
 
     if len(shape) != len(self.full_shape):
       raise ValueError(
-          "Expected equal length, but received shape={} of length {} while "
-          "self.full_shape={} is of length {}.".format(shape, len(shape),
-                                                       self.full_shape,
-                                                       len(self.full_shape)))
+          f"Expected equal length, but received shape={shape} of length {len(shape)} while self.full_shape={self.full_shape} is of length {len(self.full_shape)}."
+      )
 
     for i in xrange(len(shape)):
       if self.var_offset[i] + shape[i] > self.full_shape[i]:
         raise ValueError(
-            "With self.var_offset={}, a partition of shape={} would exceed "
-            "self.full_shape={} in dimension {}.".format(
-                self.var_offset, shape, self.full_shape, i))
+            f"With self.var_offset={self.var_offset}, a partition of shape={shape} would exceed self.full_shape={self.full_shape} in dimension {i}."
+        )
 
     slice_dim = None
     for i in xrange(len(shape)):
@@ -169,9 +162,8 @@ class _PartitionInfo(object):
         continue
       if slice_dim is not None:
         raise ValueError(
-            "Cannot use single_slice_dim() with shape={} and "
-            "self.full_shape={} since slice dim could be either dimension {} "
-            "or {}.".format(shape, self.full_shape, i, slice_dim))
+            f"Cannot use single_slice_dim() with shape={shape} and self.full_shape={self.full_shape} since slice dim could be either dimension {i} or {slice_dim}."
+        )
       slice_dim = i
 
     return slice_dim
@@ -200,15 +192,14 @@ def _call_partitioner(partitioner, shape, dtype):
 
   slicing = partitioner(shape=shape, dtype=dtype)
   if not isinstance(slicing, collections_abc.Sequence):
-    raise ValueError("Partitioner must return a sequence, but saw: %s" %
-                     slicing)
+    raise ValueError(f"Partitioner must return a sequence, but saw: {slicing}")
   if len(slicing) != shape.ndims:
     raise ValueError(
         "Partitioner returned a partition list that does not match the "
         "Variable's rank: %s vs. %s" % (slicing, shape))
   if any(p < 1 for p in slicing):
-    raise ValueError("Partitioner returned zero partitions for some axes: %s" %
-                     slicing)
+    raise ValueError(
+        f"Partitioner returned zero partitions for some axes: {slicing}")
   if sum(p > 1 for p in slicing) > 1:
     raise ValueError("Can only slice a variable along one dimension: "
                      "shape: %s, partitioning: %s" % (shape, slicing))
@@ -237,7 +228,7 @@ def _iter_slices(full_shape, num_slices, slice_dim):
   min_slice_len = full_shape[slice_dim] // num_slices
   for i in xrange(num_slices):
     shape = full_shape[:]
-    shape[slice_dim] = min_slice_len + bool(i < num_slices_with_excess)
+    shape[slice_dim] = min_slice_len + (i < num_slices_with_excess)
     yield offset[:], shape
     offset[slice_dim] += shape[slice_dim]
 
@@ -411,30 +402,29 @@ class _EmbeddingVariableStore(object):
     # Note: the parameters of _true_getter, and their documentation, match
     # *exactly* item-for-item with the docstring of this method.
     def _true_getter(  # pylint: disable=missing-docstring
-        var_store,
-        name,
-        shape=None,
-        dtype=dtypes.float32,
-        ktype=dtypes.int64,
-        initializer=None,
-        regularizer=None,
-        reuse=None,
-        trainable=None,
-        collections=None,
-        caching_device=None,
-        partitioner=None,
-        validate_shape=True,
-        constraint=None,
-        synchronization=VariableSynchronization.AUTO,
-        aggregation=VariableAggregation.NONE):
+          var_store,
+          name,
+          shape=None,
+          dtype=dtypes.float32,
+          ktype=dtypes.int64,
+          initializer=None,
+          regularizer=None,
+          reuse=None,
+          trainable=None,
+          collections=None,
+          caching_device=None,
+          partitioner=None,
+          validate_shape=True,
+          constraint=None,
+          synchronization=VariableSynchronization.AUTO,
+          aggregation=VariableAggregation.NONE):
       is_scalar = (shape is not None
                    and isinstance(shape, collections_abc.Sequence)
                    and not shape)
       # Partitioned variable case
       if partitioner is not None and not is_scalar:
         if not callable(partitioner):
-          raise ValueError("Partitioner must be callable, but received: %s" %
-                           partitioner)
+          raise ValueError(f"Partitioner must be callable, but received: {partitioner}")
         with ops.name_scope(None):
           return self._get_partitioned_variable(var_store=var_store,
                                                 name=name,
@@ -475,7 +465,7 @@ class _EmbeddingVariableStore(object):
                                               aggregation=aggregation)
 
       # Single variable case
-      if "%s/part_0" % name in var_store._vars:
+      if f"{name}/part_0" in var_store._vars:
         raise ValueError(
             "No partitioner was provided, but a partitioned version of the "
             "variable was found: %s/part_0. Perhaps a variable of the same "
@@ -668,7 +658,7 @@ class _EmbeddingVariableStore(object):
 
     slice_dim, num_slices = _get_slice_dim_and_num_slices(partitions)
 
-    if "%s/part_0" % name in var_store._vars:
+    if f"{name}/part_0" in var_store._vars:
       if "%s/part_%d" % (name, num_slices - 1) not in self._vars:
         raise ValueError(
             "Partitioner returned a different partitioning than what was "
@@ -688,16 +678,12 @@ class _EmbeddingVariableStore(object):
       partition_info = _PartitionInfo(full_shape=shape.as_list(),
                                       var_offset=var_offset)
       var_full_name = "%s/part_%d" % (name, i)
-      with ops.name_scope(var_full_name + "/PartitionedInitializer",
-                          skip_on_eager=False):
+      with ops.name_scope(f"{var_full_name}/PartitionedInitializer", skip_on_eager=False):
         # Create the tensor to initialize the variable with default value.
         if initializer is None:
           init, initializing_from_value = self._get_default_initializer(
               name=name, shape=shape, dtype=dtype)
-          if initializing_from_value:
-            init_shape = None
-          else:
-            init_shape = var_shape
+          init_shape = None if initializing_from_value else var_shape
         elif callable(initializer):
           init = initializer
           init_shape = var_shape
@@ -734,7 +720,7 @@ class _EmbeddingVariableStore(object):
           variables.Variable.SaveSliceInfo(name, shape.as_list(), var_offset,
                                            var_shape))
       vs.append(var)
-      # pylint: enable=protected-access
+        # pylint: enable=protected-access
 
     partitioned_var = variables.PartitionedVariable(name=name,
                                                     shape=shape,
@@ -909,7 +895,7 @@ class _EmbeddingVariableStore(object):
 
       def make_regularizer_op():
         with ops.colocate_with(v):
-          with ops.name_scope(name + "/Regularizer/"):
+          with ops.name_scope(f"{name}/Regularizer/"):
             return regularizer(v)
 
       if regularizer(v) is not None:
@@ -939,16 +925,14 @@ class _EmbeddingVariableStore(object):
     if dtype.is_floating:
       initializer = init_ops.glorot_uniform_initializer()
       initializing_from_value = False
-    # If dtype is DT_INT/DT_UINT, provide a default value `zero`
-    # If dtype is DT_BOOL, provide a default value `FALSE`
     elif (dtype.is_integer or dtype.is_unsigned or dtype.is_bool
           or dtype == dtypes.string):
       initializer = init_ops.zeros_initializer()
       initializing_from_value = False
-    # NOTES:Do we need to support for handling DT_STRING and DT_COMPLEX here?
     else:
-      raise ValueError("An initializer for variable %s of %s is required" %
-                       (name, dtype.base_dtype))
+      raise ValueError(
+          f"An initializer for variable {name} of {dtype.base_dtype} is required"
+      )
 
     return initializer, initializing_from_value
 
@@ -968,11 +952,11 @@ def get_variable(
     partitioner=None,
     validate_shape=True,
     constraint=None):
-  if key_dtype == dtypes.int64 or key_dtype == dtypes.int32:
+  if key_dtype in [dtypes.int64, dtypes.int32]:
     invalid_key = -1
   else:
-    raise ValueError("Not support key_dtype: %s, only support int64/int32" %
-                     key_dtype)
+    raise ValueError(
+        f"Not support key_dtype: {key_dtype}, only support int64/int32")
   if initializer is None:
     initializer = init_ops.truncated_normal_initializer()
 
@@ -985,13 +969,12 @@ def get_variable(
     caching_device = scope._caching_device
   if partitioner is None:
     partitioner = scope._partitioner
-  if not context.executing_eagerly():
-    if reuse is None:
-      reuse = scope._reuse
-  else:
+  if context.executing_eagerly():
     reuse = AUTO_REUSE
 
-  full_name = scope.name + "/" + name if scope.name else name
+  elif reuse is None:
+    reuse = scope._reuse
+  full_name = f"{scope.name}/{name}" if scope.name else name
   # Variable names only depend on variable_scope (full_name here),
   # not name_scope, so we reset it below for the time of variable creation.
   with ops.name_scope(None):

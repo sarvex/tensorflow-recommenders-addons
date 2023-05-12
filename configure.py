@@ -40,7 +40,7 @@ def write(line):
 
 
 def write_action_env(var_name, var):
-  write('build --action_env {}="{}"'.format(var_name, var))
+  write(f'build --action_env {var_name}="{var}"')
 
 
 def is_macos():
@@ -66,18 +66,18 @@ def get_tf_header_dir():
       tf_header_dir = tf_header_dir.replace("\\", "/")
   else:
     current_path = os.path.dirname(os.path.abspath(__file__))
-    tf_header_dir = "{}/build_deps/tf_header/{}/tensorflow".format(
-        current_path, tf.__version__)
+    tf_header_dir = (
+        f"{current_path}/build_deps/tf_header/{tf.__version__}/tensorflow")
   return tf_header_dir
 
 
 def get_tf_shared_lib_dir():
   # OS Specific parsing
   if is_windows():
-    tf_shared_lib_dir = tf.sysconfig.get_compile_flags()[0][2:-7] + "python"
+    tf_shared_lib_dir = f"{tf.sysconfig.get_compile_flags()[0][2:-7]}python"
     return tf_shared_lib_dir.replace("\\", "/")
   elif is_raspi_arm():
-    return tf.sysconfig.get_compile_flags()[0][2:-7] + "python"
+    return f"{tf.sysconfig.get_compile_flags()[0][2:-7]}python"
   else:
     return tf.sysconfig.get_link_flags()[0][2:]
 
@@ -124,25 +124,22 @@ def get_tf_version_integer():
         '\nNote: Only TensorFlow 2.5.1, 2.4.1, 1.15.2 are supported.')
   try:
     major, minor, patch = version.split('.')
-    assert len(
-        major
-    ) == 1, "Tensorflow major version must be length of 1. Version: {}".format(
-        version)
-    assert len(
-        minor
-    ) <= 2, "Tensorflow minor version must be less or equal to 2. Version: {}".format(
-        version)
-    assert len(
-        patch
-    ) == 1, "Tensorflow patch version must be length of 1. Version: {}".format(
-        version)
+    assert (
+        len(major) == 1
+    ), f"Tensorflow major version must be length of 1. Version: {version}"
+    assert (
+        len(minor) <= 2
+    ), f"Tensorflow minor version must be less or equal to 2. Version: {version}"
+    assert (
+        len(patch) == 1
+    ), f"Tensorflow patch version must be length of 1. Version: {version}"
   except:
-    raise ValueError('got wrong tf.__version__: {}'.format(version))
+    raise ValueError(f'got wrong tf.__version__: {version}')
   tf_version_num = str(int(major) * 1000 + int(minor) * 10 + int(patch))
   if len(tf_version_num) != 4:
-    raise ValueError('Tensorflow version flag must be length of 4 (major'
-                     ' version: 1, minor version: 2, patch_version: 1). But'
-                     ' get: {}'.format(tf_version_num))
+    raise ValueError(
+        f'Tensorflow version flag must be length of 4 (major version: 1, minor version: 2, patch_version: 1). But get: {tf_version_num}'
+    )
   return int(tf_version_num)
 
 
@@ -152,23 +149,23 @@ def check_bazel_version():
   installed_bazel_version = str(output).split(":")[1].strip()
   valid_bazel_version = _VALID_BAZEL_VERSION[tf.__version__]
   if installed_bazel_version != valid_bazel_version:
-    raise ValueError('Bazel version is {}, but {} is needed.'.format(
-        installed_bazel_version, valid_bazel_version))
+    raise ValueError(
+        f'Bazel version is {installed_bazel_version}, but {valid_bazel_version} is needed.'
+    )
 
 
 def extract_tf_header():
   tf_header_dir = get_tf_header_dir()
   tf_version_integer = get_tf_version_integer()
   if tf_version_integer < 2000:
-    _output_dir = tf_header_dir[:-(len(tf.__version__ + "/tensorflow"))]
+    _output_dir = tf_header_dir[:-len(f"{tf.__version__}/tensorflow")]
     _tar_path = tf_header_dir.replace("/tensorflow", ".tar.gz")
-    _cmd = "tar -zxvf {} --directory {} >/dev/null 2>&1".format(
-        _tar_path, _output_dir)
+    _cmd = f"tar -zxvf {_tar_path} --directory {_output_dir} >/dev/null 2>&1"
     ret = os.system(_cmd)
     if ret != 0:
       raise ValueError(
-          'Error happened when decompressing TF headers tar file:{}.'.format(
-              _tar_path))
+          f'Error happened when decompressing TF headers tar file:{_tar_path}.'
+      )
 
 
 def create_build_configuration():

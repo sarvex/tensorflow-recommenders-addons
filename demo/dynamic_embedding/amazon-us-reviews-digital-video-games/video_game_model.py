@@ -85,8 +85,7 @@ class VideoGameDnn(tf.keras.Model):
       categorical_w = tf.reduce_sum(categorical_w, axis=1)
       embeds.append(
           tf.reshape(categorical_w, (batch_size, model.embedding_size)))
-    embeds = tf.concat(embeds, axis=1)
-    return embeds
+    return tf.concat(embeds, axis=1)
 
   def dnn_net(self, x):
     out = x
@@ -101,8 +100,7 @@ class VideoGameDnn(tf.keras.Model):
     """
     embed = self.embedding_fn(self, x)
     logits = self.dnn_net(embed)
-    preds = tf.nn.sigmoid(logits)
-    return preds
+    return tf.nn.sigmoid(logits)
 
   def train(self, features, labels):
     """

@@ -14,6 +14,7 @@
 
 # lint-as: python3
 """patch on tensorflow"""
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -25,8 +26,6 @@ try:
   from tensorflow.python.keras.initializers import initializers_v2 as kinit2
 except ImportError:
   kinit2 = None
-  pass  # for compatible with TF < 2.3.x
-
 from tensorflow.core.framework import node_def_pb2
 from tensorflow.python.eager import context
 from tensorflow.python.framework import device as pydev
@@ -80,11 +79,9 @@ class _DenseDynamicEmbeddingTrainableProcessor(optimizer._OptimizableVariable):
           _apply_op = optimizer._resource_apply_sparse_duplicate_indices(
               g.values, self._v, g.indices)
         with ops.control_dependencies([_apply_op]):
-          _after = control_flow_ops.group(
+          return control_flow_ops.group(
               [self._v.update_op(v0=v0)] +
               [_s.update_op(v0=s0[si]) for si, _s in enumerate(_slots)])
-          return _after
-
       with ops.control_dependencies(_before):
         _apply_op = optimizer._resource_apply_dense(g, self._v)
       if self._v.constraint is not None:
@@ -163,15 +160,6 @@ def _create_slot_var(primary,
 
   # pylint: disable=protected-access
   if isinstance(primary, variables.Variable) and primary._save_slice_info:
-    # Primary is a partitioned variable, so we need to also indicate that
-    # the slot is a partitioned variable.  Slots have the same partitioning
-    # as their primaries.
-    # For examples when using AdamOptimizer in linear model, slot.name
-    # here can be "linear//weights/Adam:0", while primary.op.name is
-    # "linear//weight". We want to get 'Adam' as real_slot_name, so we
-    # remove "'linear//weight' + '/'" and ':0'.
-    real_slot_name = slot.name[len(primary.op.name + "/"):-2]
-    slice_info = primary._save_slice_info
     # support slot's shape not same as primary's shape
     # example: primary's shape = [10, 20, 30], slot's shape =
     # None, [], [10], [10, 20] or [10, 20, 30] is allowed
@@ -180,11 +168,22 @@ def _create_slot_var(primary,
     # slot's shape = [10] or [10, 20], set slot's slice_info according to ndims
     n = slot.shape.ndims
     if n is None or n > 0:
+          # Primary is a partitioned variable, so we need to also indicate that
+          # the slot is a partitioned variable.  Slots have the same partitioning
+          # as their primaries.
+          # For examples when using AdamOptimizer in linear model, slot.name
+          # here can be "linear//weights/Adam:0", while primary.op.name is
+          # "linear//weight". We want to get 'Adam' as real_slot_name, so we
+          # remove "'linear//weight' + '/'" and ':0'.
+      real_slot_name = slot.name[len(f"{primary.op.name}/"):-2]
+      slice_info = primary._save_slice_info
       slot._set_save_slice_info(
           variables.Variable.SaveSliceInfo(
-              slice_info.full_name + "/" + real_slot_name,
-              slice_info.full_shape[:n], slice_info.var_offset[:n],
-              slice_info.var_shape[:n]))
+              f"{slice_info.full_name}/{real_slot_name}",
+              slice_info.full_shape[:n],
+              slice_info.var_offset[:n],
+              slice_info.var_shape[:n],
+          ))
   # pylint: enable=protected-access
 
   # Copy XLA sharding attributes from primary.
@@ -194,7 +193,6 @@ def _create_slot_var(primary,
       slot = xla_sharding.copy_sharding(primary, slot, use_sharding_op=False)
     except ImportError:
       tf_logging.warn("xla_sharding not found, maybe in tf version < 2.5")
-      pass
   return slot
 
 
@@ -243,7 +241,7 @@ def device_function(self, op):
 def _assert_float_dtype(dtype):
   dtype = dtypes.as_dtype(dtype)
   if not dtype.is_floating:
-    raise ValueError("Expected floating point type, got %s." % dtype)
+    raise ValueError(f"Expected floating point type, got {dtype}.")
   return dtype
 
 
@@ -286,7 +284,7 @@ def __call__for_keras_init_v1(self, shape, dtype=None, partition_info=None):
     scale /= math_ops.maximum(1., fan_out)
   else:
     scale /= math_ops.maximum(1., (fan_in + fan_out) / 2.)
-  if self.distribution == "normal" or self.distribution == "truncated_normal":
+  if self.distribution in ["normal", "truncated_normal"]:
     # constant taken from scipy.stats.truncnorm.std(a=-2, b=2, loc=0., scale=1.)
     stddev = math_ops.sqrt(scale) / .87962566103423978
     return random_ops.truncated_normal(shape,

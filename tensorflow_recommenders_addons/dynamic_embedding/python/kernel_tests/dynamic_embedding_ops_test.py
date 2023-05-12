@@ -14,6 +14,7 @@
 # ==============================================================================
 """unit tests of embedding_lookup APIs
 """
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -30,8 +31,6 @@ try:
   from tensorflow.python.keras.initializers import initializers_v2 as kinit2
 except ImportError:
   kinit2 = None
-  pass  # for compatible with TF < 2.3.x
-
 from tensorflow.core.protobuf import cluster_pb2
 from tensorflow.core.protobuf import config_pb2
 from tensorflow.python.eager import context
@@ -192,7 +191,7 @@ def _random_weights(
                                                       stddev=1.0 /
                                                       math.sqrt(vocab_size),
                                                       dtype=dtypes.float32)
-  embedding_weights = de.get_variable(
+  return de.get_variable(
       key_dtype=key_dtype,
       value_dtype=value_dtype,
       devices=_get_devices() * num_shards,
@@ -200,7 +199,6 @@ def _random_weights(
       initializer=initializer,
       dim=embed_dim,
   )
-  return embedding_weights
 
 
 def _test_dir(temp_dir, test_name):
@@ -215,7 +213,7 @@ def _test_dir(temp_dir, test_name):
     """
   test_dir = os.path.join(temp_dir, test_name)
   if os.path.isdir(test_dir):
-    for f in glob.glob("%s/*" % test_dir):
+    for f in glob.glob(f"{test_dir}/*"):
       os.remove(f)
   else:
     os.makedirs(test_dir)
@@ -233,7 +231,7 @@ def _create_dynamic_shape_tensor(
   def _func():
     length = np.random.randint(min_len, max_len)
     tensor = np.random.randint(min_val, max_val, max_len, dtype=dtype)
-    tensor = np.array(tensor[0:length], dtype=dtype)
+    tensor = np.array(tensor[:length], dtype=dtype)
     return tensor
 
   return _func
@@ -368,12 +366,12 @@ class EmbeddingLookupTest(test.TestCase):
   def test_higher_rank(self):
     np.random.seed(8)
     with self.session(use_gpu=test_util.is_gpu_available(),
-                      config=default_config):
+                        config=default_config):
       for dim in [1, 10]:
         for ids_shape in [[3, 2], [4, 3], [4, 3, 10]]:
           with variable_scope.variable_scope("test_higher_rank", reuse=True):
             params = de.get_variable(
-                "t350-" + str(dim),
+                f"t350-{str(dim)}",
                 dtypes.int64,
                 dtypes.float32,
                 initializer=2.0,
@@ -393,15 +391,12 @@ class EmbeddingLookupTest(test.TestCase):
   def test_static_shape_checking(self):
     np.random.seed(8)
     with self.session(use_gpu=test_util.is_gpu_available(),
-                      config=default_config):
+                        config=default_config):
       for dim in [1, 10]:
         for ids_shape in [[3, 2], [4, 3], [4, 3, 10]]:
-          with variable_scope.variable_scope(
-              "test_static_shape_checking" + str(dim),
-              reuse=variable_scope.AUTO_REUSE,
-          ):
+          with variable_scope.variable_scope(f"test_static_shape_checking{str(dim)}", reuse=variable_scope.AUTO_REUSE):
             params = de.get_variable(
-                "test_static_shape_checking-" + str(dim),
+                f"test_static_shape_checking-{str(dim)}",
                 dtypes.int64,
                 dtypes.float32,
                 initializer=2.0,
@@ -422,15 +417,12 @@ class EmbeddingLookupTest(test.TestCase):
   def test_dynamic_shape_checking(self):
     np.random.seed(8)
     with self.session(use_gpu=test_util.is_gpu_available(),
-                      config=default_config):
+                        config=default_config):
       for dim in [1, 10]:
         for ids_shape in [None, [-1, 1], [1, -1, 1], [-1, 1, 1]]:
-          with variable_scope.variable_scope(
-              "test_static_shape_checking" + str(dim),
-              reuse=variable_scope.AUTO_REUSE,
-          ):
+          with variable_scope.variable_scope(f"test_static_shape_checking{str(dim)}", reuse=variable_scope.AUTO_REUSE):
             params = de.get_variable(
-                "test_static_shape_checking-" + str(dim),
+                f"test_static_shape_checking-{str(dim)}",
                 dtypes.int64,
                 dtypes.float32,
                 initializer=2.0,
@@ -626,10 +618,10 @@ class EmbeddingLookupTest(test.TestCase):
       init_list.append((kinit2.GlorotNormal(), 0.0, 0.004784))
     for initializer, target_mean, target_stddev in init_list:
       with self.session(config=default_config,
-                        use_gpu=test_util.is_gpu_available()):
+                            use_gpu=test_util.is_gpu_available()):
         id += 1
         embedding_weights = de.get_variable(
-            "emb-init-bugfix-" + str(id),
+            f"emb-init-bugfix-{id}",
             key_dtype=dtypes.int64,
             value_dtype=dtypes.float32,
             devices=_get_devices() * 3,
@@ -651,9 +643,9 @@ class EmbeddingLookupTest(test.TestCase):
         stddev = self.evaluate(math_ops.reduce_std(vals_op))
         rtol = 2e-5
         atol = rtol
-        self.assertTrue(not (list(vals_op[0]) == list(vals_op[1])))
-        self.assertAllClose(target_mean, mean, rtol, atol)
-        self.assertAllClose(target_stddev, stddev, rtol, atol)
+        self.assertTrue(list(vals_op[0]) != list(vals_op[1]))
+        self.assertAllClose(target_mean, mean, atol, atol)
+        self.assertAllClose(target_stddev, stddev, atol, atol)
 
   def test_embedding_lookup_shape(self):
 
@@ -750,9 +742,7 @@ class EmbeddingLookupSparseTest(test.TestCase):
 
     indices = []
     for batch_entry, num_val in enumerate(vals_per_batch_entry):
-      for val_index in range(num_val):
-        indices.append([batch_entry, val_index])
-
+      indices.extend([batch_entry, val_index] for val_index in range(num_val))
     shape = [batch_size, max_val_per_entry]
 
     sp_ids = sparse_tensor.SparseTensor(
@@ -779,6 +769,8 @@ class EmbeddingLookupSparseTest(test.TestCase):
   def test_embedding_lookup_sparse(self):
 
     var_id = 0
+    batch_size = 5
+
     for (
         num_shards,
         initial_mode,
@@ -803,8 +795,6 @@ class EmbeddingLookupSparseTest(test.TestCase):
         [1, 5],
     ):
       vocab_size = 2**31 if k_dtype == dtypes.int32 else 2**63
-      batch_size = 5
-
       (
           sp_ids,
           sp_weights,
@@ -820,10 +810,10 @@ class EmbeddingLookupSparseTest(test.TestCase):
           np.ones(np.sum(vals_per_batch_entry)), vals_per_batch_entry)
 
       with self.session(use_gpu=test_util.is_gpu_available(),
-                        config=default_config):
+                            config=default_config):
         var_id += 1
         params = de.get_variable(
-            "t1000-" + str(var_id),
+            f"t1000-{var_id}",
             key_dtype=k_dtype,
             value_dtype=d_dtype,
             devices=_get_devices() * num_shards,
@@ -860,7 +850,7 @@ class EmbeddingLookupSparseTest(test.TestCase):
 
         rtol = 1e-6
         atol = rtol
-        self.assertAllClose(np_embedding_sum, tf_embedding_sum, rtol, atol)
+        self.assertAllClose(np_embedding_sum, tf_embedding_sum, atol, atol)
 
   def test_embedding_lookup_sparse_shape_checking(self):
     with self.session(use_gpu=test_util.is_gpu_available(),
@@ -1166,10 +1156,10 @@ class SafeEmbeddingLookupSparseTest(test.TestCase):
         (keras_init_ops.RandomNormalV2(mean=0.0, stddev=0.001), 0.0, 0.00029),
     ]:
       with self.session(config=default_config,
-                        use_gpu=test_util.is_gpu_available()):
+                            use_gpu=test_util.is_gpu_available()):
         id += 1
         embedding_weights = de.get_variable(
-            "safe-init-bugfix-" + str(id),
+            f"safe-init-bugfix-{id}",
             key_dtype=dtypes.int64,
             value_dtype=dtypes.float32,
             devices=_get_devices() * 3,
@@ -1182,10 +1172,9 @@ class SafeEmbeddingLookupSparseTest(test.TestCase):
         indices_1d.sort()
         indices_3d = []
         for _i in range(indices_1d.size):
-          a_indice = []
           quotient = int(indices_1d[_i] / (128 * 32))
           remainder = indices_1d[_i] % (128 * 32)
-          a_indice.append(quotient)
+          a_indice = [quotient]
           quotient = int(remainder / 32)
           remainder = remainder % 32
           a_indice.extend([quotient, remainder])
@@ -1213,9 +1202,9 @@ class SafeEmbeddingLookupSparseTest(test.TestCase):
         stddev = self.evaluate(math_ops.reduce_std(vals_op))
         rtol = 2e-4
         atol = rtol
-        self.assertTrue(not (vals_op[0][0][0] == vals_op[0][0][1]))
-        self.assertAllClose(target_mean, mean, rtol, atol)
-        self.assertAllClose(target_stddev, stddev, rtol, atol)
+        self.assertTrue(vals_op[0][0][0] != vals_op[0][0][1])
+        self.assertAllClose(target_mean, mean, atol, atol)
+        self.assertAllClose(target_stddev, stddev, atol, atol)
 
   def test_safe_embedding_lookup_sparse_shape_checking(self):
     with self.session(use_gpu=test_util.is_gpu_available(),

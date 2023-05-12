@@ -83,7 +83,7 @@ optimizer = tfra.embedding_variable.AdamOptimizer(learning_rate=0.001)
 def train(epoch=1):
   for i in range(epoch):
     total_loss = np.array([])
-    for (_, batch) in enumerate(dataset_train):
+    for batch in dataset_train:
       with tf.GradientTape() as tape:
         loss = model(batch)
         total_loss = np.append(total_loss, loss)
